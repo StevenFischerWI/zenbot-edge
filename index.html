@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZenBot Edge</title>
+    <link rel="stylesheet" href="css/styles.css?v=4">
+    <script>try{if(JSON.parse(localStorage.getItem('futures-analysis-state')).theme==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <!-- Annotation plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.1.0/dist/chartjs-plugin-annotation.min.js"></script>
+</head>
+<body>
+
+<!-- Header -->
+<header class="header">
+    <h1>ZenBot Edge</h1>
+    <div class="header-right">
+        <span class="date-range" id="date-range"></span>
+        <button class="import-btn" id="header-import-btn" onclick="showImportPanel()" title="Import CSV" style="display:none">Import CSV</button>
+        <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle light/dark mode">&#9788;</button>
+    </div>
+</header>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+    <div class="sidebar-section">
+        <h3>Strategies</h3>
+        <input type="text" class="sidebar-search" placeholder="Filter strategies..." oninput="onSidebarSearch(this.value)">
+        <div class="sidebar-sort">
+            <button class="sort-btn" data-sort="pnl" onclick="onSidebarSort('pnl')">P&L</button>
+            <button class="sort-btn" data-sort="wr" onclick="onSidebarSort('wr')">WR%</button>
+            <button class="sort-btn" data-sort="trades" onclick="onSidebarSort('trades')">Trades</button>
+            <button class="sort-btn active" data-sort="name" onclick="onSidebarSort('name')">Name</button>
+        </div>
+        <div class="sidebar-selection-bar">
+            <span class="selection-count" id="selection-count" style="display:none"></span>
+            <button class="selection-btn" onclick="selectAllStrategies()">All</button>
+            <button class="selection-btn" onclick="clearStrategySelection()">Clear</button>
+        </div>
+        <ul class="strategy-list" id="strategy-list"></ul>
+    </div>
+</aside>
+
+<!-- Main Content -->
+<div class="main">
+
+    <!-- Global Filters -->
+    <div class="global-filters">
+        <span class="global-filters-label">Filters</span>
+        <select class="filter-select" id="global-direction" onchange="onDirectionFilterChange()">
+            <option value="">All Directions</option>
+            <option value="Long">Long</option>
+            <option value="Short">Short</option>
+        </select>
+        <div class="instrument-filter-wrapper">
+            <button class="filter-select instrument-filter-btn" id="instrument-filter-btn" onclick="toggleInstrumentDropdown()">Instruments</button>
+            <div class="instrument-dropdown" id="instrument-dropdown"></div>
+        </div>
+        <div class="instrument-filter-wrapper">
+            <button class="filter-select instrument-filter-btn" id="hour-filter-btn" onclick="toggleHourDropdown()">Hours</button>
+            <div class="instrument-dropdown" id="hour-dropdown"></div>
+        </div>
+        <div class="date-range-filter">
+            <input type="date" class="filter-date" id="global-date-from" onchange="onDateRangeChange()" title="From date">
+            <span class="date-range-sep">–</span>
+            <input type="date" class="filter-date" id="global-date-to" onchange="onDateRangeChange()" title="To date">
+            <div class="date-presets-wrapper">
+                <button class="date-presets-btn" onclick="toggleDatePresets()" id="date-presets-btn">Presets</button>
+                <div class="date-presets-dropdown" id="date-presets-dropdown">
+                    <button onclick="applyDatePreset('today')">Today</button>
+                    <button onclick="applyDatePreset('yesterday')">Yesterday</button>
+                    <button onclick="applyDatePreset('last7')">Last 7 Days</button>
+                    <button onclick="applyDatePreset('last30')">Last 30 Days</button>
+                    <button onclick="applyDatePreset('thisMonth')">This Month</button>
+                    <button onclick="applyDatePreset('lastMonth')">Last Month</button>
+                    <button onclick="applyDatePreset('thisYear')">This Year (YTD)</button>
+                    <button onclick="applyDatePreset('all')">All Time</button>
+                </div>
+            </div>
+        </div>
+        <button class="clear-filters-btn" id="clear-filters-btn" style="display:none" onclick="clearGlobalFilters()">Clear</button>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-row">
+        <div class="kpi-card" id="kpi-pnl"></div>
+        <div class="kpi-card" id="kpi-pf"></div>
+        <div class="kpi-card" id="kpi-winrate"></div>
+        <div class="kpi-card" id="kpi-trades"></div>
+        <div class="kpi-card" id="kpi-sharpe"></div>
+        <div class="kpi-card" id="kpi-dd"></div>
+    </div>
+
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="overview" onclick="switchTab('overview')">Overview</button>
+        <button class="tab-btn" data-tab="calendar" onclick="switchTab('calendar')">Calendar</button>
+        <button class="tab-btn" data-tab="time" onclick="switchTab('time')">Time Analysis</button>
+        <button class="tab-btn" data-tab="instruments" onclick="switchTab('instruments')">Instruments</button>
+        <button class="tab-btn" data-tab="risk" onclick="switchTab('risk')">Risk & Efficiency</button>
+        <button class="tab-btn" data-tab="trades" onclick="switchTab('trades')">Trade Log</button>
+        <button class="tab-btn" data-tab="regime" onclick="switchTab('regime')">Regime Filters</button>
+    </div>
+
+    <!-- TAB: Overview -->
+    <div class="tab-content active" id="tab-overview">
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>Equity Curve</h4>
+                <div class="chart-container"><canvas id="chart-equity"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>P&L by Instrument</h4>
+                <div class="chart-container"><canvas id="chart-inst-pnl"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>Variant Comparison</h4>
+                <div id="sub-strategy-container"></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-2 mb-16">
+            <div class="chart-card">
+                <h4>Daily P&L</h4>
+                <div class="chart-container"><canvas id="chart-daily-pnl"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h4>Profit Distribution</h4>
+                <div class="chart-container"><canvas id="chart-distribution"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-2">
+            <div class="chart-card">
+                <h4>Long vs Short — P&L</h4>
+                <div class="chart-container"><canvas id="chart-long-short"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h4>Long vs Short — Win Rate</h4>
+                <div class="chart-container"><canvas id="chart-long-short-wr"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: Calendar -->
+    <div class="tab-content" id="tab-calendar">
+        <div id="calendar-container"></div>
+    </div>
+
+    <!-- TAB: Time Analysis -->
+    <div class="tab-content" id="tab-time">
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>Hour of Day - P&L & Trade Count</h4>
+                <div class="chart-container"><canvas id="chart-hourly-pnl"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-2 mb-16">
+            <div class="chart-card">
+                <h4>Hour of Day - Win Rate</h4>
+                <div class="chart-container"><canvas id="chart-hourly-wr"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h4>Day of Week - P&L</h4>
+                <div class="chart-container"><canvas id="chart-dow-pnl"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1">
+            <div class="chart-card">
+                <h4>Hour x Day of Week Heatmap (P&L)</h4>
+                <div id="heatmap-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: Instruments -->
+    <div class="tab-content" id="tab-instruments">
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>P&L by Instrument</h4>
+                <div class="chart-container"><canvas id="chart-inst-pnl2"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1">
+            <div class="chart-card">
+                <h4>Instrument Comparison</h4>
+                <div id="inst-table-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: Risk & Efficiency -->
+    <div class="tab-content" id="tab-risk">
+        <div class="chart-grid cols-2 mb-16">
+            <div class="chart-card">
+                <h4>MAE vs Profit (Stop Placement)</h4>
+                <div class="chart-container"><canvas id="chart-mae"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h4>MFE vs Profit (Profit Left on Table)</h4>
+                <div class="chart-container"><canvas id="chart-mfe"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-2 mb-16">
+            <div class="chart-card">
+                <h4>Rolling 20-Trade Average P&L</h4>
+                <div class="chart-container"><canvas id="chart-rolling-pnl"></canvas></div>
+            </div>
+            <div class="chart-card">
+                <h4>Rolling 50-Trade Win Rate</h4>
+                <div class="chart-container"><canvas id="chart-rolling-wr"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1">
+            <div class="chart-card">
+                <h4>Consecutive Win/Loss Streaks</h4>
+                <div class="chart-container"><canvas id="chart-streaks"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB: Trade Log -->
+    <div class="tab-content" id="tab-trades">
+        <!-- Rendered dynamically by metrics.js -->
+    </div>
+
+    <!-- TAB: Regime Filters -->
+    <div class="tab-content" id="tab-regime">
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>No-Trade Filter Rules — Walk-Forward Validated (ES as market proxy)</h4>
+                <div id="regime-filters-container"></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>Combination Filters — Walk-Forward Validated</h4>
+                <div id="regime-combos-container"></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>Per-Strategy Filter Impact</h4>
+                <div id="regime-per-strategy-container"></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>Strategy-Specific Filter Discovery</h4>
+                <div id="regime-strategy-discovery-container"></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-1 mb-16">
+            <div class="chart-card">
+                <h4>Indicator Rankings (PF spread across quintiles)</h4>
+                <div id="regime-rankings-container"></div>
+            </div>
+        </div>
+        <div class="chart-grid cols-2 mb-16" id="regime-bucket-charts">
+            <!-- Dynamically populated with bucket charts -->
+        </div>
+        <div class="chart-grid cols-1">
+            <div class="chart-card">
+                <h4>Daily Regime Timeline</h4>
+                <div class="chart-container"><canvas id="chart-regime-timeline"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Import Panel (hidden by default) -->
+<div class="import-overlay" id="import-overlay" style="display:none">
+    <div class="import-panel">
+        <h2>Import Trades</h2>
+        <p class="import-desc">Drop a NinjaTrader or thinkorswim trade export CSV to analyze your trades. No data leaves your browser.</p>
+        <div class="import-dropzone" id="import-dropzone">
+            <div class="dropzone-icon">&#128206;</div>
+            <div class="dropzone-text">Drag & drop CSV file here</div>
+            <div class="dropzone-or">or</div>
+            <label class="dropzone-browse-btn">
+                Browse Files
+                <input type="file" accept=".csv" id="import-file-input" style="display:none" onchange="handleImport(this.files[0])">
+            </label>
+        </div>
+        <div class="import-status" id="import-status"></div>
+    </div>
+</div>
+
+<!-- Data & Scripts (order matters) -->
+<script src="data/trades.js"></script>
+<script src="data/regime.js"></script>
+<script src="js/utils.js?v=4"></script>
+<script src="js/charts.js?v=4"></script>
+<script src="js/metrics.js?v=4"></script>
+<script src="js/import.js?v=4"></script>
+<script src="js/app.js?v=4"></script>
+
+</body>
+</html>
