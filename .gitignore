@@ -1,0 +1,5 @@
+data/
+reports/
+*.md
+__pycache__/
+.claude/

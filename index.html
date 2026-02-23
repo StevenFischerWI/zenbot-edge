@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZenBot Edge</title>
-    <link rel="stylesheet" href="css/styles.css?v=4">
+    <link rel="stylesheet" href="css/styles.css?v=5">
     <script>try{if(JSON.parse(localStorage.getItem('futures-analysis-state')).theme==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -46,6 +46,9 @@
 <!-- Main Content -->
 <div class="main">
 
+    <!-- Active Filter Summary -->
+    <div class="filter-summary" id="filter-summary" style="display:none"></div>
+
     <!-- Global Filters -->
     <div class="global-filters">
         <span class="global-filters-label">Filters</span>
@@ -59,7 +62,7 @@
             <div class="instrument-dropdown" id="instrument-dropdown"></div>
         </div>
         <div class="instrument-filter-wrapper">
-            <button class="filter-select instrument-filter-btn" id="hour-filter-btn" onclick="toggleHourDropdown()">Hours</button>
+            <button class="filter-select instrument-filter-btn" id="hour-filter-btn" onclick="toggleHourDropdown()">Time</button>
             <div class="instrument-dropdown" id="hour-dropdown"></div>
         </div>
         <div class="date-range-filter">
@@ -101,7 +104,6 @@
         <button class="tab-btn" data-tab="instruments" onclick="switchTab('instruments')">Instruments</button>
         <button class="tab-btn" data-tab="risk" onclick="switchTab('risk')">Risk & Efficiency</button>
         <button class="tab-btn" data-tab="trades" onclick="switchTab('trades')">Trade Log</button>
-        <button class="tab-btn" data-tab="regime" onclick="switchTab('regime')">Regime Filters</button>
     </div>
 
     <!-- TAB: Overview -->
@@ -155,13 +157,13 @@
     <div class="tab-content" id="tab-time">
         <div class="chart-grid cols-1 mb-16">
             <div class="chart-card">
-                <h4>Hour of Day - P&L & Trade Count</h4>
+                <h4>Half Hour - P&L & Trade Count</h4>
                 <div class="chart-container"><canvas id="chart-hourly-pnl"></canvas></div>
             </div>
         </div>
         <div class="chart-grid cols-2 mb-16">
             <div class="chart-card">
-                <h4>Hour of Day - Win Rate</h4>
+                <h4>Half Hour - Win Rate</h4>
                 <div class="chart-container"><canvas id="chart-hourly-wr"></canvas></div>
             </div>
             <div class="chart-card">
@@ -171,7 +173,7 @@
         </div>
         <div class="chart-grid cols-1">
             <div class="chart-card">
-                <h4>Hour x Day of Week Heatmap (P&L)</h4>
+                <h4>Half Hour x Day of Week Heatmap (P&L)</h4>
                 <div id="heatmap-container"></div>
             </div>
         </div>
@@ -228,49 +230,6 @@
         <!-- Rendered dynamically by metrics.js -->
     </div>
 
-    <!-- TAB: Regime Filters -->
-    <div class="tab-content" id="tab-regime">
-        <div class="chart-grid cols-1 mb-16">
-            <div class="chart-card">
-                <h4>No-Trade Filter Rules — Walk-Forward Validated (ES as market proxy)</h4>
-                <div id="regime-filters-container"></div>
-            </div>
-        </div>
-        <div class="chart-grid cols-1 mb-16">
-            <div class="chart-card">
-                <h4>Combination Filters — Walk-Forward Validated</h4>
-                <div id="regime-combos-container"></div>
-            </div>
-        </div>
-        <div class="chart-grid cols-1 mb-16">
-            <div class="chart-card">
-                <h4>Per-Strategy Filter Impact</h4>
-                <div id="regime-per-strategy-container"></div>
-            </div>
-        </div>
-        <div class="chart-grid cols-1 mb-16">
-            <div class="chart-card">
-                <h4>Strategy-Specific Filter Discovery</h4>
-                <div id="regime-strategy-discovery-container"></div>
-            </div>
-        </div>
-        <div class="chart-grid cols-1 mb-16">
-            <div class="chart-card">
-                <h4>Indicator Rankings (PF spread across quintiles)</h4>
-                <div id="regime-rankings-container"></div>
-            </div>
-        </div>
-        <div class="chart-grid cols-2 mb-16" id="regime-bucket-charts">
-            <!-- Dynamically populated with bucket charts -->
-        </div>
-        <div class="chart-grid cols-1">
-            <div class="chart-card">
-                <h4>Daily Regime Timeline</h4>
-                <div class="chart-container"><canvas id="chart-regime-timeline"></canvas></div>
-            </div>
-        </div>
-    </div>
-
 </div>
 
 <!-- Import Panel (hidden by default) -->
@@ -293,12 +252,11 @@
 
 <!-- Data & Scripts (order matters) -->
 <script src="data/trades.js"></script>
-<script src="data/regime.js"></script>
-<script src="js/utils.js?v=4"></script>
-<script src="js/charts.js?v=4"></script>
-<script src="js/metrics.js?v=4"></script>
-<script src="js/import.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<script src="js/utils.js?v=5"></script>
+<script src="js/charts.js?v=5"></script>
+<script src="js/metrics.js?v=5"></script>
+<script src="js/import.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
 
 </body>
 </html>

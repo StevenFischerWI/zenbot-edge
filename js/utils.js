@@ -76,6 +76,16 @@ function formatDateTime(iso) {
     return formatDateFull(iso) + ' ' + formatTime(iso);
 }
 
+function formatHalfHourLabel(hh) {
+    // hh is "HH:MM" like "09:00" or "14:30"
+    const [hourStr, minStr] = hh.split(':');
+    const hr = parseInt(hourStr);
+    const min = minStr || '00';
+    const suffix = hr < 12 ? 'A' : 'P';
+    const display = hr === 0 ? 12 : hr > 12 ? hr - 12 : hr;
+    return `${display}:${min}${suffix}`;
+}
+
 function heatmapColor(val, maxAbs) {
     if (val === 0 || maxAbs === 0) return 'transparent';
     const intensity = Math.min(Math.abs(val) / maxAbs, 1);

@@ -112,10 +112,10 @@ function computeMetrics(trades, name) {
         shortAvg: shorts.length ? r2(mean(shorts.map(t => t.profit))) : 0,
     };
 
-    // Hourly P&L, win rate, trade count
+    // Half-hour P&L, win rate, trade count
     const hourlyMap = {};
     for (const t of trades) {
-        const h = t.entryHour;
+        const h = t.entryHalfHour || (String(t.entryHour).padStart(2, '0') + ':00');
         if (!hourlyMap[h]) hourlyMap[h] = { pnl: 0, trades: 0, wins: 0, decisions: 0 };
         hourlyMap[h].pnl += t.profit;
         hourlyMap[h].trades++;
@@ -123,7 +123,7 @@ function computeMetrics(trades, name) {
         if (t.profit !== 0) hourlyMap[h].decisions++;
     }
     const hourlyPnL = {}, hourlyWinRate = {}, hourlyTradeCount = {};
-    for (const h of Object.keys(hourlyMap).sort((a, b) => +a - +b)) {
+    for (const h of Object.keys(hourlyMap).sort()) {
         const v = hourlyMap[h];
         hourlyPnL[h] = r2(v.pnl);
         hourlyTradeCount[h] = v.trades;
@@ -149,12 +149,12 @@ function computeMetrics(trades, name) {
         }
     }
 
-    // Hour x Day matrix
+    // Half-hour x Day matrix
     const hourDayMatrix = {};
     for (const d of DAY_NAMES.slice(0, 5)) hourDayMatrix[d] = {};
     for (const t of trades) {
         const d = DAY_NAMES[t.entryDayOfWeek];
-        const h = String(t.entryHour);
+        const h = t.entryHalfHour || (String(t.entryHour).padStart(2, '0') + ':00');
         if (hourDayMatrix[d]) {
             hourDayMatrix[d][h] = r2((hourDayMatrix[d][h] || 0) + t.profit);
         }
@@ -303,7 +303,10 @@ function getGlobalFilteredTrades() {
         trades = trades.filter(t => appState.globalInstruments.has(t.instrument));
     }
     if (appState.globalHours.size > 0) {
-        trades = trades.filter(t => appState.globalHours.has(t.entryHour));
+        trades = trades.filter(t => {
+            const hh = t.entryHalfHour || (String(t.entryHour).padStart(2, '0') + ':00');
+            return appState.globalHours.has(hh);
+        });
     }
     if (appState.globalDateFrom) {
         trades = trades.filter(t => t.entryDate >= appState.globalDateFrom);

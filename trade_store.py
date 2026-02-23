@@ -14,7 +14,7 @@ TRADE_COLUMNS = [
     "id", "instrument", "instrumentFull", "strategy", "subStrategy",
     "direction", "qty", "entryPrice", "exitPrice", "entryTime", "exitTime",
     "entryName", "exitName", "profit", "commission", "mae", "mfe", "etd",
-    "bars", "holdingMinutes", "entryHour", "entryDayOfWeek", "entryDate",
+    "bars", "holdingMinutes", "entryHour", "entryHalfHour", "entryDayOfWeek", "entryDate",
 ]
 
 # Dedup key columns — same grouping key used by read_trades()
@@ -53,6 +53,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             bars            INTEGER,
             holdingMinutes  REAL,
             entryHour       INTEGER,
+            entryHalfHour   TEXT,
             entryDayOfWeek  INTEGER,
             entryDate       TEXT,
             source_file     TEXT,
@@ -115,6 +116,9 @@ def read_all_trades(conn: sqlite3.Connection) -> list[dict]:
                      "mae", "mfe", "etd", "holdingMinutes"):
             if t[key] is not None:
                 t[key] = float(t[key])
+        # Backfill entryHalfHour from entryHour if missing (old DB records)
+        if not t.get("entryHalfHour") and t.get("entryHour") is not None:
+            t["entryHalfHour"] = f"{t['entryHour']:02d}:00"
         trades.append(t)
     return trades
 

@@ -146,6 +146,7 @@ def _finalize_trade(fills: list[dict], instrument_base: str, instrument_full: st
         "bars": 0,
         "holdingMinutes": round(holding_seconds / 60, 2),
         "entryHour": entry_time.hour,
+        "entryHalfHour": f"{entry_time.hour:02d}:{'00' if entry_time.minute < 30 else '30'}",
         "entryDayOfWeek": entry_time.weekday(),
         "entryDate": entry_time.strftime("%Y-%m-%d"),
     }

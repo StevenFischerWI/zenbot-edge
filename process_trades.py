@@ -159,6 +159,7 @@ def read_trades(csv_path: str) -> list[dict]:
             "bars": max_bars,
             "holdingMinutes": round(holding_seconds / 60, 2),
             "entryHour": entry_time.hour,
+            "entryHalfHour": f"{entry_time.hour:02d}:{'00' if entry_time.minute < 30 else '30'}",
             "entryDayOfWeek": entry_time.weekday(),
             "entryDate": entry_time.strftime("%Y-%m-%d"),
         }
@@ -265,22 +266,24 @@ def compute_metrics(trades: list[dict], strategy_name: str) -> dict:
         "shortAvg": round(statistics.mean([t["profit"] for t in shorts]), 2) if shorts else 0,
     }
 
-    # Hourly P&L and win rate
-    hourly = defaultdict(lambda: {"pnl": 0, "trades": 0, "wins": 0})
+    # Half-hour P&L and win rate
+    hourly = defaultdict(lambda: {"pnl": 0, "trades": 0, "wins": 0, "decisions": 0})
     for t in trades:
-        h = t["entryHour"]
+        h = t["entryHalfHour"]
         hourly[h]["pnl"] += t["profit"]
         hourly[h]["trades"] += 1
         if t["profit"] > 0:
             hourly[h]["wins"] += 1
+        if t["profit"] != 0:
+            hourly[h]["decisions"] += 1
     hourly_pnl = {}
     hourly_win_rate = {}
     hourly_trade_count = {}
     for h in sorted(hourly.keys()):
-        hourly_pnl[str(h)] = round(hourly[h]["pnl"], 2)
-        hourly_trade_count[str(h)] = hourly[h]["trades"]
-        decisions_h = sum(1 for t in trades if t["entryHour"] == h and t["profit"] != 0)
-        hourly_win_rate[str(h)] = round((hourly[h]["wins"] / decisions_h) * 100, 1) if decisions_h > 0 else 0
+        hourly_pnl[h] = round(hourly[h]["pnl"], 2)
+        hourly_trade_count[h] = hourly[h]["trades"]
+        decisions_h = hourly[h]["decisions"]
+        hourly_win_rate[h] = round((hourly[h]["wins"] / decisions_h) * 100, 1) if decisions_h > 0 else 0
 
     # Day-of-week P&L
     dow = defaultdict(lambda: {"pnl": 0, "trades": 0, "wins": 0})
@@ -300,13 +303,13 @@ def compute_metrics(trades: list[dict], strategy_name: str) -> dict:
             decisions_d = sum(1 for t in trades if DAY_NAMES[t["entryDayOfWeek"]] == d and t["profit"] != 0)
             dow_win_rate[d] = round((dow[d]["wins"] / decisions_d) * 100, 1) if decisions_d > 0 else 0
 
-    # Hour x Day-of-week matrix (for heatmap)
+    # Half-hour x Day-of-week matrix (for heatmap)
     hour_day_matrix = {}
     for d in DAY_NAMES[:5]:
         hour_day_matrix[d] = {}
     for t in trades:
         d = DAY_NAMES[t["entryDayOfWeek"]]
-        h = str(t["entryHour"])
+        h = t["entryHalfHour"]
         if d in hour_day_matrix:
             hour_day_matrix[d][h] = round(hour_day_matrix[d].get(h, 0) + t["profit"], 2)
 

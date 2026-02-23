@@ -52,7 +52,7 @@ function loadState() {
         }
 
         // Restore tab
-        const validTabs = ['overview', 'calendar', 'time', 'instruments', 'risk', 'trades', 'regime'];
+        const validTabs = ['overview', 'calendar', 'time', 'instruments', 'risk', 'trades'];
         if (validTabs.includes(s.activeTab)) {
             appState.activeTab = s.activeTab;
         }
@@ -75,7 +75,7 @@ function loadState() {
             appState.globalInstruments = new Set(restored);
         }
         if (Array.isArray(s.globalHours)) {
-            appState.globalHours = new Set(s.globalHours.filter(h => typeof h === 'number' && h >= 0 && h <= 23));
+            appState.globalHours = new Set(s.globalHours.filter(h => typeof h === 'string' && /^\d{2}:\d{2}$/.test(h)));
         }
 
         // Restore theme
@@ -103,9 +103,10 @@ function applyRestoredState() {
         const cb = document.querySelector(`#instrument-dropdown input[value="${inst}"]`);
         if (cb) cb.checked = true;
     });
+    syncAllInstrumentsPreset();
     updateInstrumentBtn();
 
-    // Sync hour checkboxes and button
+    // Sync half-hour checkboxes and button
     appState.globalHours.forEach(h => {
         const cb = document.querySelector(`#hour-dropdown input[value="${h}"]`);
         if (cb) cb.checked = true;
@@ -283,18 +284,19 @@ function populateGlobalFilters() {
         ...instruments.filter(i => !pinnedSet.has(i)).sort((a, b) => a.localeCompare(b))
     ];
     const dd = document.getElementById('instrument-dropdown');
-    dd.innerHTML = sortedInstruments.map(inst =>
+    dd.innerHTML = `<label class="hour-preset"><input type="checkbox" id="instrument-preset-all" onchange="onInstrumentPresetAll(this.checked)"> <strong>All Instruments</strong></label><div class="hour-preset-divider"></div>`
+        + sortedInstruments.map(inst =>
         `<label><input type="checkbox" value="${inst}" onchange="onInstrumentToggle('${inst}', this.checked)"> ${inst}</label>`
     ).join('');
 
-    // Build hour checkbox list from hours present in data
+    // Build half-hour checkbox list from half-hours present in data
     const allTrades = appState.data.trades;
-    const hoursPresent = [...new Set(allTrades.map(t => t.entryHour))].sort((a, b) => a - b);
+    const halfHoursPresent = [...new Set(allTrades.map(t => t.entryHalfHour || (String(t.entryHour).padStart(2, '0') + ':00')))].sort();
     const hourDD = document.getElementById('hour-dropdown');
-    hourDD.innerHTML = `<label class="hour-preset"><input type="checkbox" id="hour-preset-all" onchange="onHourPresetAll(this.checked)"> <strong>All Hours</strong></label>`
-        + `<label class="hour-preset"><input type="checkbox" id="hour-preset-rth" onchange="onHourPresetRTH(this.checked)"> <strong>RTH (9–16)</strong></label><div class="hour-preset-divider"></div>`
-        + hoursPresent.map(h =>
-        `<label><input type="checkbox" value="${h}" onchange="onHourToggle(${h}, this.checked)"> ${String(h).padStart(2, '0')}:00</label>`
+    hourDD.innerHTML = `<label class="hour-preset"><input type="checkbox" id="hour-preset-all" onchange="onHourPresetAll(this.checked)"> <strong>All</strong></label>`
+        + `<label class="hour-preset"><input type="checkbox" id="hour-preset-rth" onchange="onHourPresetRTH(this.checked)"> <strong>RTH (9:30–16:00)</strong></label><div class="hour-preset-divider"></div>`
+        + halfHoursPresent.map(h =>
+        `<label><input type="checkbox" value="${h}" onchange="onHourToggle('${h}', this.checked)"> ${formatHalfHourLabel(h)}</label>`
     ).join('');
 
     // Set date input bounds and defaults from data range
@@ -319,12 +321,32 @@ function toggleInstrumentDropdown() {
     document.getElementById('instrument-dropdown').classList.toggle('open');
 }
 
-function onInstrumentToggle(inst, checked) {
-    if (checked) appState.globalInstruments.add(inst);
-    else appState.globalInstruments.delete(inst);
+function onInstrumentPresetAll(checked) {
+    document.querySelectorAll('#instrument-dropdown input[value]').forEach(cb => {
+        const inst = cb.value;
+        if (checked) appState.globalInstruments.add(inst);
+        else appState.globalInstruments.delete(inst);
+        cb.checked = checked;
+    });
     updateInstrumentBtn();
     saveState();
     applyGlobalFilters();
+}
+
+function onInstrumentToggle(inst, checked) {
+    if (checked) appState.globalInstruments.add(inst);
+    else appState.globalInstruments.delete(inst);
+    syncAllInstrumentsPreset();
+    updateInstrumentBtn();
+    saveState();
+    applyGlobalFilters();
+}
+
+function syncAllInstrumentsPreset() {
+    const allCb = document.getElementById('instrument-preset-all');
+    if (!allCb) return;
+    const allCheckboxes = document.querySelectorAll('#instrument-dropdown input[value]');
+    allCb.checked = allCheckboxes.length > 0 && [...allCheckboxes].every(cb => cb.checked);
 }
 
 function updateInstrumentBtn() {
@@ -337,11 +359,11 @@ function toggleHourDropdown() {
     document.getElementById('hour-dropdown').classList.toggle('open');
 }
 
-const RTH_HOURS = [9, 10, 11, 12, 13, 14, 15, 16];
+const RTH_HOURS = ['09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00'];
 
 function onHourPresetAll(checked) {
     document.querySelectorAll('#hour-dropdown input[value]').forEach(cb => {
-        const h = parseInt(cb.value);
+        const h = cb.value;
         if (checked) appState.globalHours.add(h);
         else appState.globalHours.delete(h);
         cb.checked = checked;
@@ -365,9 +387,9 @@ function onHourPresetRTH(checked) {
     applyGlobalFilters();
 }
 
-function onHourToggle(hour, checked) {
-    if (checked) appState.globalHours.add(hour);
-    else appState.globalHours.delete(hour);
+function onHourToggle(halfHour, checked) {
+    if (checked) appState.globalHours.add(halfHour);
+    else appState.globalHours.delete(halfHour);
     syncRTHPreset();
     syncAllHoursPreset();
     updateHourBtn();
@@ -392,7 +414,7 @@ function syncAllHoursPreset() {
 function updateHourBtn() {
     const btn = document.getElementById('hour-filter-btn');
     const n = appState.globalHours.size;
-    btn.textContent = n > 0 ? `Hours (${n})` : 'Hours';
+    btn.textContent = n > 0 ? `Time (${n})` : 'Time';
 }
 
 function onDateRangeChange() {
@@ -531,6 +553,85 @@ function updateFilterBadge() {
         || appState.globalHours.size > 0
         || hasDateFilter;
     document.getElementById('clear-filters-btn').style.display = hasFilter ? 'inline-block' : 'none';
+    renderFilterSummary();
+}
+
+function renderFilterSummary() {
+    const el = document.getElementById('filter-summary');
+    if (!el) return;
+    const dr = appState.data.metadata.dateRange;
+    const chips = [];
+    const x = (fn) => `<button class="filter-chip-x" onclick="${fn}" title="Remove filter">&times;</button>`;
+
+    if (appState.globalDirection) {
+        chips.push(`<span class="filter-chip filter-chip-direction"><span class="filter-chip-label">Dir:</span> ${appState.globalDirection}${x('clearFilterDirection()')}</span>`);
+    }
+
+    if (appState.globalInstruments.size > 0) {
+        const list = [...appState.globalInstruments].sort().join(', ');
+        chips.push(`<span class="filter-chip filter-chip-instrument"><span class="filter-chip-label">Instr:</span> ${list}${x('clearFilterInstruments()')}</span>`);
+    }
+
+    if (appState.globalHours.size > 0) {
+        const sorted = [...appState.globalHours].sort();
+        let label;
+        if (sorted.length <= 4) {
+            label = sorted.map(h => formatHalfHourLabel(h)).join(', ');
+        } else {
+            label = formatHalfHourLabel(sorted[0]) + ' \u2013 ' + formatHalfHourLabel(sorted[sorted.length - 1]) + ` (${sorted.length})`;
+        }
+        chips.push(`<span class="filter-chip filter-chip-time"><span class="filter-chip-label">Time:</span> ${label}${x('clearFilterTime()')}</span>`);
+    }
+
+    const hasDateFrom = appState.globalDateFrom && appState.globalDateFrom > dr.start;
+    const hasDateTo = appState.globalDateTo && appState.globalDateTo < dr.end;
+    if (hasDateFrom || hasDateTo) {
+        const from = hasDateFrom ? formatDateFull(appState.globalDateFrom) : dr.start;
+        const to = hasDateTo ? formatDateFull(appState.globalDateTo) : dr.end;
+        chips.push(`<span class="filter-chip filter-chip-date"><span class="filter-chip-label">Date:</span> ${from} \u2013 ${to}${x('clearFilterDate()')}</span>`);
+    }
+
+    if (chips.length === 0) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return;
+    }
+
+    el.style.display = 'flex';
+    el.innerHTML = '<span class="filter-summary-label">Active</span>' + chips.join('<span class="filter-chip-sep">|</span>');
+}
+
+function clearFilterDirection() {
+    appState.globalDirection = '';
+    document.getElementById('global-direction').value = '';
+    saveState();
+    applyGlobalFilters();
+}
+
+function clearFilterInstruments() {
+    appState.globalInstruments.clear();
+    document.querySelectorAll('#instrument-dropdown input').forEach(cb => cb.checked = false);
+    updateInstrumentBtn();
+    saveState();
+    applyGlobalFilters();
+}
+
+function clearFilterTime() {
+    appState.globalHours.clear();
+    document.querySelectorAll('#hour-dropdown input').forEach(cb => cb.checked = false);
+    updateHourBtn();
+    saveState();
+    applyGlobalFilters();
+}
+
+function clearFilterDate() {
+    const dr = appState.data.metadata.dateRange;
+    appState.globalDateFrom = '';
+    appState.globalDateTo = dr.end;
+    document.getElementById('global-date-from').value = '';
+    document.getElementById('global-date-to').value = dr.end;
+    saveState();
+    applyGlobalFilters();
 }
 
 // --- Sidebar ---
@@ -758,12 +859,6 @@ function destroyAllCharts() {
 }
 
 function renderTab(tabName) {
-    // Regime tab doesn't need per-strategy metrics
-    if (tabName === 'regime') {
-        if (typeof REGIME_DATA !== 'undefined') renderRegimeTab();
-        return;
-    }
-
     const m = getActiveMetrics();
     if (!m || m.tradeCount === 0) return;
 

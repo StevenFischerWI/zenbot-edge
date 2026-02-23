@@ -196,6 +196,7 @@ function parseNinjaTraderCSV(csvText) {
             bars: maxBars,
             holdingMinutes: Math.round((holdingSeconds / 60) * 100) / 100,
             entryHour: entryTime.getHours(),
+            entryHalfHour: String(entryTime.getHours()).padStart(2, '0') + ':' + (entryTime.getMinutes() < 30 ? '00' : '30'),
             entryDayOfWeek: pyDay,
             entryDate: formatDateOnly(entryTime),
         };
@@ -429,6 +430,7 @@ function buildSchwabTrade(openFill, closeFill, qty, direction, root, account) {
         bars: 0,
         holdingMinutes: holdingMinutes,
         entryHour: entryTime.getHours(),
+        entryHalfHour: String(entryTime.getHours()).padStart(2, '0') + ':' + (entryTime.getMinutes() < 30 ? '00' : '30'),
         entryDayOfWeek: pyDay,
         entryDate: formatDateOnly(entryTime),
     };
