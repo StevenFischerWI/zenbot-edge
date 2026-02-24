@@ -296,8 +296,9 @@ def read_nt_trades(db_path: str = DEFAULT_NT_DB,
     print(f"  Reading NinjaTrader database: {db_path}")
     print(f"  Account filter: {accounts}")
 
-    # Open NT database read-only
-    nt_conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    # Open NT database read-only; use immutable mode so it works even while
+    # NinjaTrader is running and holds a lock on the file
+    nt_conn = sqlite3.connect(f"file:{db_path}?immutable=1", uri=True)
 
     try:
         # Get strategy name mappings
