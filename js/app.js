@@ -135,7 +135,7 @@ function applyRestoredState() {
         const cb = document.querySelector(`#instrument-dropdown input[value="${inst}"]`);
         if (cb) cb.checked = true;
     });
-    syncAllInstrumentsPreset();
+    syncInstrumentPresets();
     updateInstrumentBtn();
 
     // Sync half-hour checkboxes and button
@@ -325,7 +325,9 @@ function populateGlobalFilters() {
         ...instruments.filter(i => !pinnedSet.has(i)).sort((a, b) => a.localeCompare(b))
     ];
     const dd = document.getElementById('instrument-dropdown');
-    dd.innerHTML = `<label class="hour-preset"><input type="checkbox" id="instrument-preset-all" onchange="onInstrumentPresetAll(this.checked)"> <strong>All Instruments</strong></label><div class="hour-preset-divider"></div>`
+    dd.innerHTML = `<label class="hour-preset"><input type="checkbox" id="instrument-preset-all" onchange="onInstrumentPresetAll(this.checked)"> <strong>All</strong></label>`
+        + `<label class="hour-preset"><input type="checkbox" id="instrument-preset-usual" onchange="onInstrumentPresetUsual(this.checked)"> <strong>Usual</strong></label>`
+        + `<label class="hour-preset"><input type="checkbox" id="instrument-preset-micros" onchange="onInstrumentPresetMicros(this.checked)"> <strong>Micros</strong></label><div class="hour-preset-divider"></div>`
         + sortedInstruments.map(inst =>
         `<label><input type="checkbox" value="${inst}" onchange="onInstrumentToggle('${inst}', this.checked)"> ${inst}</label>`
     ).join('');
@@ -376,25 +378,58 @@ function onInstrumentPresetAll(checked) {
         else appState.globalInstruments.delete(inst);
         cb.checked = checked;
     });
+    syncInstrumentPresets();
     updateInstrumentBtn();
     saveState();
     applyGlobalFilters();
 }
+
+const USUAL_INSTRUMENTS = new Set(['ES', 'MES', 'NQ', 'MNQ', 'RTY', 'M2K', 'CL', 'MCL', 'GC', 'MGC', 'YM', 'MYM']);
+const MICRO_INSTRUMENTS = new Set(['MES', 'MNQ', 'M2K', 'MCL', 'MGC', 'MYM']);
 
 function onInstrumentToggle(inst, checked) {
     if (checked) appState.globalInstruments.add(inst);
     else appState.globalInstruments.delete(inst);
-    syncAllInstrumentsPreset();
+    syncInstrumentPresets();
     updateInstrumentBtn();
     saveState();
     applyGlobalFilters();
 }
 
-function syncAllInstrumentsPreset() {
+function _applyInstrumentPreset(presetSet, checked) {
+    document.querySelectorAll('#instrument-dropdown input[value]').forEach(cb => {
+        const inst = cb.value;
+        if (checked) {
+            if (presetSet.has(inst)) { cb.checked = true; appState.globalInstruments.add(inst); }
+            else { cb.checked = false; appState.globalInstruments.delete(inst); }
+        } else {
+            if (presetSet.has(inst)) { cb.checked = false; appState.globalInstruments.delete(inst); }
+        }
+    });
+    syncInstrumentPresets();
+    updateInstrumentBtn();
+    saveState();
+    applyGlobalFilters();
+}
+
+function onInstrumentPresetUsual(checked) {
+    _applyInstrumentPreset(USUAL_INSTRUMENTS, checked);
+}
+
+function onInstrumentPresetMicros(checked) {
+    _applyInstrumentPreset(MICRO_INSTRUMENTS, checked);
+}
+
+function syncInstrumentPresets() {
     const allCb = document.getElementById('instrument-preset-all');
-    if (!allCb) return;
+    const usualCb = document.getElementById('instrument-preset-usual');
+    const microsCb = document.getElementById('instrument-preset-micros');
     const allCheckboxes = document.querySelectorAll('#instrument-dropdown input[value]');
-    allCb.checked = allCheckboxes.length > 0 && [...allCheckboxes].every(cb => cb.checked);
+    const checkedSet = appState.globalInstruments;
+
+    if (allCb) allCb.checked = allCheckboxes.length > 0 && [...allCheckboxes].every(cb => cb.checked);
+    if (usualCb) usualCb.checked = [...USUAL_INSTRUMENTS].some(i => checkedSet.has(i)) && [...USUAL_INSTRUMENTS].filter(i => document.querySelector(`#instrument-dropdown input[value="${i}"]`)).every(i => checkedSet.has(i));
+    if (microsCb) microsCb.checked = [...MICRO_INSTRUMENTS].some(i => checkedSet.has(i)) && [...MICRO_INSTRUMENTS].filter(i => document.querySelector(`#instrument-dropdown input[value="${i}"]`)).every(i => checkedSet.has(i));
 }
 
 function updateInstrumentBtn() {
