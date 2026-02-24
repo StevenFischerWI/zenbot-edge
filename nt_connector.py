@@ -48,24 +48,29 @@ def _ticks_to_datetime(ticks: int) -> datetime:
 def _derive_strategy(account_name: str) -> tuple[str, str]:
     """Derive (strategy, subStrategy) from a NinjaTrader account name.
 
+    Normalizes spaces to hyphens so NT accounts like "Sim-Levels 2M" produce
+    the same strategy name ("Levels-2M") as the CSV pipeline's "Sim-Levels-2M".
+
     Returns:
         (strategy, subStrategy) tuple
     """
-    sub_strategy = account_name
+    # Normalize: replace spaces with hyphens for consistency with CSV pipeline
+    normalized = account_name.replace(" ", "-")
+    sub_strategy = normalized
 
     # Strip "Sim" prefix variations
-    if account_name.startswith("Sim-"):
-        strategy = account_name[4:]
-    elif account_name.startswith("Sim"):
-        strategy = account_name[3:]
-    elif account_name.startswith("Playback"):
-        strategy = account_name
+    if normalized.startswith("Sim-"):
+        strategy = normalized[4:]
+    elif normalized.startswith("Sim"):
+        strategy = normalized[3:]
+    elif normalized.startswith("Playback"):
+        strategy = normalized
     else:
-        strategy = account_name
+        strategy = normalized
 
-    # If strategy is empty or just digits, keep the full account name
+    # If strategy is empty or just digits, keep the full name
     if not strategy or strategy.isdigit():
-        strategy = account_name
+        strategy = normalized
 
     return strategy, sub_strategy
 
