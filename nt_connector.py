@@ -14,6 +14,8 @@ import fnmatch
 import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta
+from pathlib import Path
+from urllib.parse import quote
 
 from execution_converter import POINT_VALUES, _finalize_trade
 
@@ -296,9 +298,16 @@ def read_nt_trades(db_path: str = DEFAULT_NT_DB,
     print(f"  Reading NinjaTrader database: {db_path}")
     print(f"  Account filter: {accounts}")
 
-    # Open NT database read-only; use immutable mode so it works even while
-    # NinjaTrader is running and holds a lock on the file
-    nt_conn = sqlite3.connect(f"file:{db_path}?immutable=1", uri=True)
+    # Verify the file exists before attempting connection
+    db_file = Path(db_path)
+    if not db_file.exists():
+        print(f"  ERROR: Database file not found: {db_path}")
+        return []
+
+    # Build a proper file URI — forward slashes, URL-encode spaces/special chars
+    # so the SQLite URI parser handles paths like "NinjaTrader 8" correctly
+    uri_path = quote(str(db_file.resolve()).replace("\\", "/"), safe="/:")
+    nt_conn = sqlite3.connect(f"file:{uri_path}?immutable=1", uri=True)
 
     try:
         # Get strategy name mappings
