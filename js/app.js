@@ -740,10 +740,10 @@ function renderSidebar() {
     </li>`;
 
     items.forEach(item => {
+        if (sidebarOverride && item.trades === 0) return; // hide strategies with no matching trades
         const variantLabel = item.variants > 1 ? `<span style="color:var(--text-muted);font-size:10px"> (${item.variants})</span>` : '';
-        const dimClass = item.trades === 0 ? ' style="opacity:0.35"' : '';
         const isSelected = appState.selectedStrategies.has(item.key);
-        html += `<li class="strategy-item ${isSelected ? 'active' : ''}"${dimClass} onclick="toggleStrategy('${item.key}')">
+        html += `<li class="strategy-item ${isSelected ? 'active' : ''}" onclick="toggleStrategy('${item.key}')">
             <span class="strategy-checkbox">${isSelected ? '&#9745;' : '&#9744;'}</span>
             <span class="name" title="${item.key}">${item.name}${variantLabel}</span>
             <span class="meta"><span class="trades-badge">${item.trades}</span> <span class="pnl-badge ${profitClass(item.pnl)}">${formatCurrencyShort(item.pnl)}</span></span>
