@@ -238,8 +238,10 @@ def compute_metrics(trades: list[dict], strategy_name: str) -> dict:
     max_p = min(max(profits), 2000)
     bin_start = (int(min_p) // bin_size) * bin_size
     bin_end = ((int(max_p) // bin_size) + 1) * bin_size
+    if bin_end <= bin_start:
+        bin_end = bin_start + bin_size
     bins = list(range(bin_start, bin_end + bin_size, bin_size))
-    counts = [0] * (len(bins) - 1)
+    counts = [0] * max(len(bins) - 1, 1)
     for p in profits:
         clamped = max(min_p, min(max_p, p))
         idx = int((clamped - bin_start) / bin_size)
