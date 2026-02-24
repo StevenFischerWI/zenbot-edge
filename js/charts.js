@@ -261,11 +261,30 @@ function renderLongVsShortWinRate(canvasId, lsData) {
     });
 }
 
-function renderInstrumentPnLBar(canvasId, instPnL, vertical) {
+function onInstrumentBarClick(event, elements, chart) {
+    if (!elements.length) return;
+    const idx = elements[0].index;
+    const instrument = chart.data.labels[idx];
+    if (!instrument) return;
+    // Set filter to just this instrument
+    appState.globalInstruments.clear();
+    appState.globalInstruments.add(instrument);
+    // Sync checkboxes
+    document.querySelectorAll('#instrument-dropdown input[value]').forEach(cb => {
+        cb.checked = cb.value === instrument;
+    });
+    syncAllInstrumentsPreset();
+    updateInstrumentBtn();
+    saveState();
+    applyGlobalFilters();
+}
+
+function renderInstrumentPnLBar(canvasId, instPnL, vertical, allInstruments) {
     const ctx = document.getElementById(canvasId).getContext('2d');
-    const sorted = Object.entries(instPnL).sort((a, b) => a[0].localeCompare(b[0]));
-    const labels = sorted.map(s => s[0]);
-    const values = sorted.map(s => s[1]);
+    const allKeys = allInstruments ? [...allInstruments].sort() : Object.keys(instPnL).sort();
+    const labels = allKeys;
+    const values = allKeys.map(k => instPnL[k] || 0);
+    const clickHandler = { onClick: onInstrumentBarClick, onHover: (e, els) => { e.native.target.style.cursor = els.length ? 'pointer' : 'default'; } };
     if (vertical) {
         return new Chart(ctx, {
             type: 'bar',
@@ -281,6 +300,7 @@ function renderInstrumentPnLBar(canvasId, instPnL, vertical) {
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                ...clickHandler,
                 plugins: {
                     tooltip: { callbacks: { label: (ctx) => formatCurrency(ctx.parsed.y) } }
                 },
@@ -306,6 +326,7 @@ function renderInstrumentPnLBar(canvasId, instPnL, vertical) {
             indexAxis: 'y',
             responsive: true,
             maintainAspectRatio: false,
+            ...clickHandler,
             plugins: {
                 tooltip: { callbacks: { label: (ctx) => formatCurrency(ctx.parsed.x) } }
             },

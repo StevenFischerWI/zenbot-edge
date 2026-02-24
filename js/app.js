@@ -17,6 +17,36 @@ const appState = {
 };
 
 const STATE_KEY = 'futures-analysis-state';
+const DATA_KEY = 'futures-analysis-data';
+const IDB_NAME = 'futures-analysis-db';
+const IDB_STORE = 'tradedata';
+
+function idbOpen() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(IDB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+    });
+}
+
+function idbSaveData(data) {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(data, DATA_KEY);
+        tx.oncomplete = () => { db.close(); resolve(); };
+        tx.onerror = () => { db.close(); reject(tx.error); };
+    }));
+}
+
+function idbLoadData() {
+    return idbOpen().then(db => new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readonly');
+        const req = tx.objectStore(IDB_STORE).get(DATA_KEY);
+        req.onsuccess = () => { db.close(); resolve(req.result); };
+        req.onerror = () => { db.close(); reject(req.error); };
+    }));
+}
 
 function saveState() {
     try {
@@ -95,8 +125,10 @@ function loadState() {
 }
 
 function applyRestoredState() {
-    // Sync direction dropdown
-    document.getElementById('global-direction').value = appState.globalDirection;
+    // Sync direction buttons
+    document.querySelectorAll('.direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === appState.globalDirection);
+    });
 
     // Sync instrument checkboxes and button
     appState.globalInstruments.forEach(inst => {
@@ -162,16 +194,7 @@ function toggleTheme() {
     saveState();
 }
 
-function init() {
-    if (typeof TRADE_DATA === 'undefined') {
-        // No pre-built data — show import panel
-        document.querySelector('.sidebar').style.display = 'none';
-        document.querySelector('.main').style.display = 'none';
-        document.getElementById('import-overlay').style.display = 'flex';
-        setupDropzone();
-        applyTheme();
-        return;
-    }
+function initDashboard() {
     appState.data = TRADE_DATA;
     document.getElementById('header-import-btn').style.display = '';
     loadState();
@@ -185,6 +208,34 @@ function init() {
     renderTab(appState.activeTab);
 }
 
+function showImportOverlay() {
+    document.querySelector('.sidebar').style.display = 'none';
+    document.querySelector('.main').style.display = 'none';
+    document.getElementById('import-overlay').style.display = 'flex';
+    setupDropzone();
+    applyTheme();
+    renderFilterSummary();
+}
+
+function init() {
+    if (typeof TRADE_DATA !== 'undefined') {
+        initDashboard();
+        return;
+    }
+
+    // Try restoring last imported data from IndexedDB
+    idbLoadData().then(cached => {
+        if (cached) {
+            window.TRADE_DATA = cached;
+            initDashboard();
+        } else {
+            showImportOverlay();
+        }
+    }).catch(() => {
+        showImportOverlay();
+    });
+}
+
 function initFromImport() {
     // Hide import panel, show dashboard
     document.getElementById('import-overlay').style.display = 'none';
@@ -192,7 +243,10 @@ function initFromImport() {
     document.querySelector('.main').style.display = '';
     document.getElementById('header-import-btn').style.display = '';
 
-    // Reset appState for new data
+    // Save imported data to IndexedDB for next reload
+    idbSaveData(TRADE_DATA).catch(() => { /* storage error — ignore */ });
+
+    // Set new data, then restore saved filters/state
     appState.data = TRADE_DATA;
     appState.selectedStrategies = new Set(['_ALL']);
     appState.activeTab = 'overview';
@@ -203,31 +257,18 @@ function initFromImport() {
     appState.globalHours = new Set();
     appState.globalDateFrom = '';
     appState.globalDateTo = '';
+    loadState();
     destroyAllCharts();
 
     // Re-sync UI
     initChartDefaults();
     renderHeader();
     populateGlobalFilters();
-
-    // Reset tab UI
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelector('.tab-btn[data-tab="overview"]').classList.add('active');
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-    document.getElementById('tab-overview').classList.add('active');
-
-    // Reset sidebar sort UI
-    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
-    const nameBtn = document.querySelector('.sort-btn[data-sort="name"]');
-    if (nameBtn) nameBtn.classList.add('active');
-
-    // Clear search
-    const searchInput = document.querySelector('.sidebar-search');
-    if (searchInput) searchInput.value = '';
+    applyRestoredState();
 
     renderSidebar();
     renderKPIs();
-    renderTab('overview');
+    renderTab(appState.activeTab);
     saveState();
 }
 
@@ -312,7 +353,14 @@ function populateGlobalFilters() {
 }
 
 function onDirectionFilterChange() {
-    appState.globalDirection = document.getElementById('global-direction').value;
+    setDirectionFilter(appState.globalDirection);
+}
+
+function setDirectionFilter(value) {
+    appState.globalDirection = value;
+    document.querySelectorAll('.direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === value);
+    });
     saveState();
     applyGlobalFilters();
 }
@@ -352,7 +400,7 @@ function syncAllInstrumentsPreset() {
 function updateInstrumentBtn() {
     const btn = document.getElementById('instrument-filter-btn');
     const n = appState.globalInstruments.size;
-    btn.textContent = n > 0 ? `Instruments (${n})` : 'Instruments';
+    btn.textContent = n > 0 ? `Instruments (${n})` : 'All Trades';
 }
 
 function toggleHourDropdown() {
@@ -522,7 +570,9 @@ function applyGlobalFilters() {
 
 function clearGlobalFilters() {
     const dr = appState.data.metadata.dateRange;
-    document.getElementById('global-direction').value = '';
+    document.querySelectorAll('.direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === '');
+    });
     document.getElementById('global-date-from').value = '';
     document.getElementById('global-date-to').value = dr.end;
     appState.globalDirection = '';
@@ -559,6 +609,10 @@ function updateFilterBadge() {
 function renderFilterSummary() {
     const el = document.getElementById('filter-summary');
     if (!el) return;
+    if (!appState.data) {
+        el.innerHTML = '<span class="filter-summary-label">All Trades</span>';
+        return;
+    }
     const dr = appState.data.metadata.dateRange;
     const chips = [];
     const x = (fn) => `<button class="filter-chip-x" onclick="${fn}" title="Remove filter">&times;</button>`;
@@ -592,18 +646,18 @@ function renderFilterSummary() {
     }
 
     if (chips.length === 0) {
-        el.style.display = 'none';
-        el.innerHTML = '';
+        el.innerHTML = '<span class="filter-summary-label">All Trades</span>';
         return;
     }
 
-    el.style.display = 'flex';
     el.innerHTML = '<span class="filter-summary-label">Active</span>' + chips.join('<span class="filter-chip-sep">|</span>');
 }
 
 function clearFilterDirection() {
     appState.globalDirection = '';
-    document.getElementById('global-direction').value = '';
+    document.querySelectorAll('.direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === '');
+    });
     saveState();
     applyGlobalFilters();
 }
@@ -874,7 +928,7 @@ function renderTab(tabName) {
             appState.chartInstances.dist = renderProfitDistribution('chart-distribution', m.profitDistribution);
             appState.chartInstances.longShort = renderLongVsShort('chart-long-short', m.longShort);
             appState.chartInstances.longShortWr = renderLongVsShortWinRate('chart-long-short-wr', m.longShort);
-            appState.chartInstances.instPnl = renderInstrumentPnLBar('chart-inst-pnl', m.instrumentPnL, true);
+            appState.chartInstances.instPnl = renderInstrumentPnLBar('chart-inst-pnl', m.instrumentPnL, true, appState.data.metadata.instruments);
             break;
 
         case 'time':
@@ -885,7 +939,7 @@ function renderTab(tabName) {
             break;
 
         case 'instruments':
-            appState.chartInstances.instPnl2 = renderInstrumentPnLBar('chart-inst-pnl2', m.instrumentPnL, true);
+            appState.chartInstances.instPnl2 = renderInstrumentPnLBar('chart-inst-pnl2', m.instrumentPnL, true, appState.data.metadata.instruments);
             renderInstrumentTable('inst-table-container', m.instrumentDetails);
             break;
 

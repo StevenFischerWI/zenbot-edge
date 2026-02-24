@@ -4,7 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ZenBot Edge</title>
-    <link rel="stylesheet" href="css/styles.css?v=5">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css?v=6">
     <script>try{if(JSON.parse(localStorage.getItem('futures-analysis-state')).theme==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
@@ -47,16 +50,16 @@
 <div class="main">
 
     <!-- Active Filter Summary -->
-    <div class="filter-summary" id="filter-summary" style="display:none"></div>
+    <div class="filter-summary" id="filter-summary"></div>
 
     <!-- Global Filters -->
     <div class="global-filters">
         <span class="global-filters-label">Filters</span>
-        <select class="filter-select" id="global-direction" onchange="onDirectionFilterChange()">
-            <option value="">All Directions</option>
-            <option value="Long">Long</option>
-            <option value="Short">Short</option>
-        </select>
+        <div class="direction-btn-group" id="direction-btn-group">
+            <button class="direction-btn active" data-value="" onclick="setDirectionFilter('')">All</button>
+            <button class="direction-btn" data-value="Long" onclick="setDirectionFilter('Long')">Long</button>
+            <button class="direction-btn" data-value="Short" onclick="setDirectionFilter('Short')">Short</button>
+        </div>
         <div class="instrument-filter-wrapper">
             <button class="filter-select instrument-filter-btn" id="instrument-filter-btn" onclick="toggleInstrumentDropdown()">Instruments</button>
             <div class="instrument-dropdown" id="instrument-dropdown"></div>

@@ -71,9 +71,13 @@ body {
 }
 
 .header h1 {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--text-primary);
+    font-family: 'Press Start 2P', cursive;
+    font-size: 14px;
+    font-weight: 400;
+    color: #00c853;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    word-spacing: -6px;
 }
 
 .header-right {
@@ -856,6 +860,38 @@ body {
 }
 
 .filter-select:focus { border-color: var(--accent); }
+
+.direction-btn-group {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.direction-btn {
+    padding: 5px 10px;
+    font-size: 12px;
+    font-family: inherit;
+    background: var(--bg-card);
+    color: var(--text-secondary);
+    border: none;
+    border-right: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.direction-btn:last-child {
+    border-right: none;
+}
+
+.direction-btn:hover {
+    background: var(--bg-secondary);
+}
+
+.direction-btn.active {
+    background: var(--accent);
+    color: #fff;
+}
 
 /* Calendar */
 .calendar-summary {
