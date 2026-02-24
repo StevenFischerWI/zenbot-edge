@@ -9,6 +9,7 @@ Usage:
     python ingest.py file.csv         # Ingest specific file(s)
     python ingest.py --bootstrap      # One-time load from all-trades.csv
     python ingest.py --executions F   # Ingest from execution log CSV
+    python ingest.py --ninjatrader    # Sync from NinjaTrader SQLite database
     python ingest.py --history        # Show ingestion log
     python ingest.py --regenerate     # Regenerate dashboard without ingesting
     python ingest.py --no-regime      # Skip regime_analysis.py after regeneration
@@ -22,6 +23,7 @@ import sys
 from pathlib import Path
 
 import execution_converter
+import nt_connector
 import process_trades
 import trade_store
 
@@ -217,6 +219,33 @@ def cmd_ingest_executions(conn, csv_path: str, run_regime: bool = True) -> None:
         print("No new trades ingested — skipping regeneration.")
 
 
+def cmd_ingest_ninjatrader(conn, nt_db_path: str, nt_accounts: str,
+                           run_regime: bool = True) -> None:
+    """Ingest trades directly from NinjaTrader's SQLite database."""
+    print(f"Syncing from NinjaTrader database...")
+    trades = nt_connector.read_nt_trades(nt_db_path, accounts=nt_accounts)
+
+    if not trades:
+        print("  No trades reconstructed — nothing to ingest.")
+        return
+
+    # Insert with dedup
+    source_label = f"NinjaTrader:{Path(nt_db_path).name}"
+    new_count, dup_count = trade_store.insert_trades(conn, trades,
+                                                     source_file=source_label)
+
+    # Log ingestion
+    trade_store.log_ingestion(conn, nt_db_path, source_label,
+                              len(trades), len(trades), new_count, dup_count)
+
+    print(f"\n  {new_count} new trades, {dup_count} duplicates skipped")
+
+    if new_count > 0:
+        regenerate_dashboard(conn, run_regime=run_regime)
+    else:
+        print("No new trades ingested — skipping regeneration.")
+
+
 def cmd_scan_daily(conn, run_regime: bool = True) -> None:
     """Scan the daily directory for new CSV files and ingest them."""
     csvs = discover_new_csvs()
@@ -249,6 +278,12 @@ def main():
                         help="Regenerate dashboard without ingesting")
     parser.add_argument("--executions", type=str, metavar="CSV",
                         help="Ingest trades reconstructed from an execution log CSV")
+    parser.add_argument("--ninjatrader", "--nt", action="store_true",
+                        help="Sync trades from NinjaTrader's SQLite database")
+    parser.add_argument("--nt-db", type=str, default=nt_connector.DEFAULT_NT_DB,
+                        help="Path to NinjaTrader.sqlite (default: NT8 user docs)")
+    parser.add_argument("--nt-accounts", type=str, default="Sim*",
+                        help="Account name filter pattern (default: Sim*)")
     parser.add_argument("--no-regime", action="store_true",
                         help="Skip regime_analysis.py after regeneration")
     parser.add_argument("--db", type=str, default=None,
@@ -270,6 +305,9 @@ def main():
             cmd_bootstrap(conn, run_regime=run_regime)
         elif args.executions:
             cmd_ingest_executions(conn, args.executions, run_regime=run_regime)
+        elif args.ninjatrader:
+            cmd_ingest_ninjatrader(conn, args.nt_db, args.nt_accounts,
+                                   run_regime=run_regime)
         elif args.files:
             cmd_ingest_files(conn, args.files, run_regime=run_regime)
         else:

@@ -71,6 +71,11 @@ def init_db(conn: sqlite3.Connection) -> None:
             trades_dup  INTEGER DEFAULT 0
         );
     """)
+    # Migrate: add entryHalfHour column if missing (added after initial schema)
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(trades)").fetchall()}
+    if "entryHalfHour" not in cols:
+        conn.execute("ALTER TABLE trades ADD COLUMN entryHalfHour TEXT")
+        conn.commit()
 
 
 def insert_trades(conn: sqlite3.Connection, trades: list[dict],
