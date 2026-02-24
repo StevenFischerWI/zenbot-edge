@@ -57,19 +57,21 @@ function barColors(values) {
     return values.map(v => v >= 0 ? profit : loss);
 }
 
+const TZ = 'America/New_York';
+
 function formatDate(iso) {
     const d = new Date(iso);
-    return `${d.getMonth() + 1}/${d.getDate()}`;
+    return d.toLocaleDateString('en-US', { timeZone: TZ, month: 'numeric', day: 'numeric' });
 }
 
 function formatDateFull(iso) {
     const d = new Date(iso);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return d.toLocaleDateString('en-US', { timeZone: TZ, month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function formatTime(iso) {
     const d = new Date(iso);
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit' });
+    return d.toLocaleTimeString('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit', second: '2-digit' });
 }
 
 function formatDateTime(iso) {
