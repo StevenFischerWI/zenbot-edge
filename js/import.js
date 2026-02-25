@@ -437,6 +437,178 @@ function buildSchwabTrade(openFill, closeFill, qty, direction, root, account) {
 }
 
 // ============================================================
+// thinkorswim Account Statement (Futures Statements) Parser
+// ============================================================
+
+function parseSchwabFee(val) {
+    if (!val) return 0;
+    val = val.trim();
+    if (val === '--') return 0;
+    return parseCurrency(val);
+}
+
+/**
+ * Parse a thinkorswim "Account Statement" CSV (Futures Statements section).
+ * Unlike the Account Trade History format, this has no Pos Effect column —
+ * we infer TO OPEN / TO CLOSE via FIFO position tracking per root symbol.
+ */
+function parseSchwabAccountStatement(csvText) {
+    const lines = csvText.split(/\r?\n/);
+
+    // Find account name from "Account Statement for XXXX ..."
+    let account = 'Default';
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        const acctMatch = line.match(/Account Statement for\s+(\S+)/i);
+        if (acctMatch) {
+            account = acctMatch[1];
+            break;
+        }
+    }
+
+    // Find "Futures Statements" section
+    let futuresStart = -1;
+    for (let i = 0; i < lines.length; i++) {
+        if (lines[i].trim() === 'Futures Statements') {
+            futuresStart = i;
+            break;
+        }
+    }
+    if (futuresStart === -1) return [];
+
+    // Next non-blank line is column headers
+    let headerIdx = -1;
+    for (let j = futuresStart + 1; j < lines.length; j++) {
+        if (lines[j].trim()) {
+            headerIdx = j;
+            break;
+        }
+    }
+    if (headerIdx === -1) return [];
+
+    const headers = parseCSVLine(lines[headerIdx]).map(h => h.trim());
+    const col = (name) => headers.indexOf(name);
+    const iExecDate = col('Exec Date');
+    const iExecTime = col('Exec Time');
+    const iType = col('Type');
+    const iDescription = col('Description');
+    const iMiscFees = col('Misc Fees');
+    const iCommFees = col('Commissions & Fees');
+
+    if (iDescription === -1 || iType === -1) return [];
+
+    // Parse TRD rows with futures symbols
+    const allFills = [];
+    const descRe = /^(BOT|SOLD)\s+[+-]?(\d+)\s+(\/\w+)(?::\w+)?\s+@(\S+)$/;
+
+    for (let i = headerIdx + 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Stop at next section
+        if (/^(Forex Statements|Account Order History|Total Cash)/.test(line) ||
+            line.startsWith('"Crypto')) break;
+
+        const row = parseCSVLine(line);
+        if (row.length < 6) continue;
+
+        const type = (row[iType] || '').trim();
+        if (type !== 'TRD') continue;
+
+        const description = (row[iDescription] || '').trim();
+        const m = descRe.exec(description);
+        if (!m) continue;
+
+        const side = m[1] === 'BOT' ? 'BUY' : 'SELL';
+        const qty = parseInt(m[2]);
+        const symbol = m[3]; // e.g., /MCLH26 (exchange suffix stripped)
+        const price = parseFloat(m[4]);
+        if (!qty || isNaN(price) || !symbol.startsWith('/')) continue;
+
+        // Build exec datetime from Exec Date + Exec Time
+        // Trade Date may be '*' for unsettled trades — always use Exec Date
+        const execDateStr = (iExecDate !== -1 && row[iExecDate]) ? row[iExecDate].trim() : '';
+        const execTimeStr = (iExecTime !== -1 && row[iExecTime]) ? row[iExecTime].trim() : '';
+        if (!execDateStr || !execTimeStr) continue;
+
+        const execTime = parseSchwabDateTime(execDateStr + ' ' + execTimeStr);
+        if (!execTime || isNaN(execTime.getTime())) continue;
+
+        // Parse fees (both columns may be absent or '--')
+        const miscFees = Math.abs(parseSchwabFee(iMiscFees !== -1 ? row[iMiscFees] : ''));
+        const commFees = Math.abs(parseSchwabFee(iCommFees !== -1 ? row[iCommFees] : ''));
+        const feePerContract = (miscFees + commFees) / qty;
+
+        allFills.push({ execTime, side, qty, symbol, price, feePerContract, account });
+    }
+
+    // Group by root symbol for FIFO matching
+    const fillsByRoot = {};
+    for (const fill of allFills) {
+        const root = getFuturesRoot(fill.symbol);
+        if (!fillsByRoot[root]) fillsByRoot[root] = [];
+        fillsByRoot[root].push(fill);
+    }
+
+    const trades = [];
+
+    for (const root of Object.keys(fillsByRoot)) {
+        const fills = fillsByRoot[root];
+        // Ensure chronological order
+        fills.sort((a, b) => a.execTime - b.execTime);
+
+        const longQueue = [];
+        const shortQueue = [];
+
+        for (const fill of fills) {
+            if (fill.side === 'BUY') {
+                // Try to close shorts first
+                let remaining = fill.qty;
+                while (remaining > 0 && shortQueue.length > 0) {
+                    const open = shortQueue[0];
+                    const matchQty = Math.min(remaining, open.qty);
+                    const commission = Math.round((open.feePerContract + fill.feePerContract) * matchQty * 100) / 100;
+                    const trade = buildSchwabTrade(open, fill, matchQty, 'Short', root, account);
+                    trade.commission = commission;
+                    trades.push(trade);
+                    remaining -= matchQty;
+                    open.qty -= matchQty;
+                    if (open.qty <= 0) shortQueue.shift();
+                }
+                if (remaining > 0) {
+                    longQueue.push({ ...fill, qty: remaining });
+                }
+            } else {
+                // Try to close longs first
+                let remaining = fill.qty;
+                while (remaining > 0 && longQueue.length > 0) {
+                    const open = longQueue[0];
+                    const matchQty = Math.min(remaining, open.qty);
+                    const commission = Math.round((open.feePerContract + fill.feePerContract) * matchQty * 100) / 100;
+                    const trade = buildSchwabTrade(open, fill, matchQty, 'Long', root, account);
+                    trade.commission = commission;
+                    trades.push(trade);
+                    remaining -= matchQty;
+                    open.qty -= matchQty;
+                    if (open.qty <= 0) longQueue.shift();
+                }
+                if (remaining > 0) {
+                    shortQueue.push({ ...fill, qty: remaining });
+                }
+            }
+        }
+    }
+
+    // Sort by exitTime, assign sequential IDs
+    trades.sort((a, b) => a.exitTime.localeCompare(b.exitTime));
+    for (let i = 0; i < trades.length; i++) {
+        trades[i].id = i + 1;
+    }
+
+    return trades;
+}
+
+// ============================================================
 // Build TRADE_DATA structure from parsed trades
 // ============================================================
 
@@ -538,9 +710,13 @@ function handleImport(file) {
             const text = e.target.result;
             if (statusEl) statusEl.textContent = 'Parsing trades...';
 
-            // Auto-detect format: thinkorswim vs NinjaTrader
+            // Auto-detect format: thinkorswim (two variants) vs NinjaTrader
+            // Check Futures Statements first — Account Statement files contain both
+            // sections, and the Futures Statements parser handles that format correctly.
             let trades;
-            if (text.indexOf('Account Trade History') !== -1) {
+            if (text.indexOf('Futures Statements') !== -1) {
+                trades = parseSchwabAccountStatement(text);
+            } else if (text.indexOf('Account Trade History') !== -1) {
                 trades = parseSchwabCSV(text);
             } else {
                 trades = parseNinjaTraderCSV(text);
