@@ -13,15 +13,17 @@ Usage:
 import fnmatch
 import sqlite3
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
+from zoneinfo import ZoneInfo
 
 from execution_converter import POINT_VALUES, _finalize_trade
 
 # .NET epoch: 0001-01-01 00:00:00 UTC
 # .NET ticks = 100-nanosecond intervals since that epoch
 _DOTNET_EPOCH = datetime(1, 1, 1)
+_ET = ZoneInfo("America/New_York")
 
 # NinjaTrader OrderAction enum
 _ORDER_ACTION_BUY = {0, 1}        # Buy, BuyToCover
@@ -41,8 +43,12 @@ _EXIT_NAMES = {"Stop loss", "Profit target", "Close", "Exit", "Stop1", "Stop2",
 
 
 def _ticks_to_datetime(ticks: int) -> datetime:
-    """Convert .NET ticks (100ns intervals since 0001-01-01) to Python datetime."""
-    return _DOTNET_EPOCH + timedelta(microseconds=ticks // 10)
+    """Convert .NET ticks (100ns intervals since 0001-01-01 UTC) to Eastern naive datetime."""
+    utc_dt = _DOTNET_EPOCH + timedelta(microseconds=ticks // 10)
+    # .NET ticks are UTC — convert to Eastern, then strip tzinfo for consistency
+    # with the CSV pipeline which stores naive Eastern datetimes
+    et_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone(_ET)
+    return et_dt.replace(tzinfo=None)
 
 
 def _derive_strategy(account_name: str) -> tuple[str, str]:
