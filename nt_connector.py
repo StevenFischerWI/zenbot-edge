@@ -75,22 +75,6 @@ def _derive_strategy(account_name: str) -> tuple[str, str]:
     return strategy, sub_strategy
 
 
-def _get_strategy_names(nt_conn: sqlite3.Connection) -> dict[int, str]:
-    """Build a map of execution ID → strategy name from Strategy2Execution joins."""
-    cursor = nt_conn.execute("""
-        SELECT se.Execution, s.Name, s.Classname
-        FROM Strategy2Execution se
-        JOIN Strategies s ON se.Strategy = s.Id
-    """)
-    result = {}
-    for exec_id, name, classname in cursor.fetchall():
-        # Prefer the strategy name; for AtmStrategy use the generic name
-        if classname == "NinjaTrader.NinjaScript.AtmStrategy":
-            result[exec_id] = None  # ATM — use account-based naming
-        else:
-            result[exec_id] = name
-    return result
-
 
 def _determine_action(order_action, fill_name: str) -> str | None:
     """Determine 'Buy' or 'Sell' from OrderAction enum or fill name fallback.
@@ -315,10 +299,6 @@ def read_nt_trades(db_path: str = DEFAULT_NT_DB,
     nt_conn = sqlite3.connect(f"file:{uri_path}?immutable=1", uri=True)
 
     try:
-        # Get strategy name mappings
-        strategy_names = _get_strategy_names(nt_conn)
-
-        # Read all fills
         fills = _read_fills(nt_conn, accounts)
     finally:
         nt_conn.close()
@@ -379,16 +359,8 @@ def read_nt_trades(db_path: str = DEFAULT_NT_DB,
                         if buy_q != sell_q:
                             imbalanced += 1
 
-                        # Override strategy naming for NT accounts
+                        # Derive strategy from account name only
                         strategy, sub_strategy = _derive_strategy(account)
-
-                        # Check if any fill has a linked NinjaScript strategy name
-                        for f in current_fills:
-                            sname = strategy_names.get(f["id"])
-                            if sname:
-                                strategy = sname
-                                break
-
                         trade["strategy"] = strategy
                         trade["subStrategy"] = sub_strategy
 
