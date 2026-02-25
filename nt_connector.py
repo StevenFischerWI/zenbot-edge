@@ -16,14 +16,44 @@ from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
-from zoneinfo import ZoneInfo
 
 from execution_converter import POINT_VALUES, _finalize_trade
 
 # .NET epoch: 0001-01-01 00:00:00 UTC
 # .NET ticks = 100-nanosecond intervals since that epoch
 _DOTNET_EPOCH = datetime(1, 1, 1)
-_ET = ZoneInfo("America/New_York")
+
+# Try zoneinfo first (works on Linux / Python with tzdata), fall back to
+# dateutil, and finally to a manual EST/EDT implementation for Windows
+try:
+    from zoneinfo import ZoneInfo
+    _ET = ZoneInfo("America/New_York")
+except (ImportError, KeyError):
+    try:
+        from dateutil import tz
+        _ET = tz.gettz("America/New_York")
+    except ImportError:
+        # Manual Eastern time: determine EST vs EDT from the datetime itself
+        _ET = None
+
+_EST = timezone(timedelta(hours=-5))
+_EDT = timezone(timedelta(hours=-4))
+
+
+def _is_dst(dt_utc: datetime) -> bool:
+    """Check if a UTC datetime falls in US Eastern Daylight Time.
+    DST: 2nd Sunday of March 2:00 AM ET to 1st Sunday of November 2:00 AM ET.
+    """
+    year = dt_utc.year
+    # 2nd Sunday of March
+    march1 = datetime(year, 3, 1)
+    dst_start = march1 + timedelta(days=(6 - march1.weekday()) % 7 + 7)
+    dst_start = dst_start.replace(hour=7)  # 2 AM ET = 7 AM UTC
+    # 1st Sunday of November
+    nov1 = datetime(year, 11, 1)
+    dst_end = nov1 + timedelta(days=(6 - nov1.weekday()) % 7)
+    dst_end = dst_end.replace(hour=6)  # 2 AM ET = 6 AM UTC
+    return dst_start <= dt_utc < dst_end
 
 # NinjaTrader OrderAction enum
 _ORDER_ACTION_BUY = {0, 1}        # Buy, BuyToCover
@@ -47,7 +77,12 @@ def _ticks_to_datetime(ticks: int) -> datetime:
     utc_dt = _DOTNET_EPOCH + timedelta(microseconds=ticks // 10)
     # .NET ticks are UTC — convert to Eastern, then strip tzinfo for consistency
     # with the CSV pipeline which stores naive Eastern datetimes
-    et_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone(_ET)
+    if _ET is not None:
+        et_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone(_ET)
+    else:
+        # Fallback: manual EST/EDT calculation
+        tz_offset = _EDT if _is_dst(utc_dt) else _EST
+        et_dt = utc_dt.replace(tzinfo=timezone.utc).astimezone(tz_offset)
     return et_dt.replace(tzinfo=None)
 
 
