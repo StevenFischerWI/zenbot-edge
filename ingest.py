@@ -31,6 +31,7 @@ DAILY_DIR = Path(r"D:\futures\daily")
 PROCESSED_DIR = DAILY_DIR / "processed"
 BOOTSTRAP_CSV = Path(r"D:\futures\code\all-trades.csv")
 OUTPUT_JS = Path(__file__).parent / "data" / "trades.js"
+STRATEGIES_JS = Path(__file__).parent / "data" / "strategies.js"
 
 
 def count_csv_rows(path: Path) -> int:
@@ -118,6 +119,17 @@ def discover_new_csvs() -> list[Path]:
     return csvs
 
 
+def export_strategy_configs(nt_db_path: str) -> None:
+    """Extract NinjaTrader strategy configs and write data/strategies.js."""
+    import json
+    configs = nt_connector.read_nt_strategy_configs(nt_db_path)
+    STRATEGIES_JS.parent.mkdir(parents=True, exist_ok=True)
+    json_str = json.dumps(configs, separators=(",", ":"))
+    with open(STRATEGIES_JS, "w", encoding="utf-8") as f:
+        f.write(f"const STRATEGY_CONFIGS = {json_str};\n")
+    print(f"  Strategy configs: {STRATEGIES_JS} ({len(configs)} strategies)")
+
+
 def regenerate_dashboard(conn, run_regime: bool = True) -> None:
     """Read all trades from SQLite and regenerate data/trades.js."""
     trades = trade_store.read_all_trades(conn)
@@ -128,10 +140,19 @@ def regenerate_dashboard(conn, run_regime: bool = True) -> None:
         return
 
     print(f"\nRegenerating dashboard from {total_in_db} trades in DB...")
-    output, *_ = process_trades.build_dashboard_output(
-        trades, source_label="trades.db", total_trades_raw=total_in_db
-    )
+    output, families_sorted, strategy_metrics, all_metrics, by_family, kept = \
+        process_trades.build_dashboard_output(
+            trades, source_label="trades.db", total_trades_raw=total_in_db
+        )
     process_trades.write_trades_js(output, OUTPUT_JS)
+
+    # Regenerate text reports
+    all_dates = sorted(set(t["entryDate"] for t in kept))
+    reports_dir = Path(__file__).parent / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    process_trades.write_summary_csv(reports_dir, families_sorted, strategy_metrics, all_metrics)
+    process_trades.write_summary_markdown(reports_dir, families_sorted, strategy_metrics, all_metrics, all_dates, kept)
+    process_trades.write_per_strategy_reports(reports_dir, families_sorted, strategy_metrics, by_family)
 
     if run_regime:
         regime_script = Path(__file__).parent / "regime_analysis.py"
@@ -225,6 +246,9 @@ def cmd_ingest_ninjatrader(conn, nt_db_path: str, nt_accounts: str,
     print(f"Syncing from NinjaTrader database...")
     trades = nt_connector.read_nt_trades(nt_db_path, accounts=nt_accounts)
 
+    # Always export strategy configs (even if no new trades)
+    export_strategy_configs(nt_db_path)
+
     if not trades:
         print("  No trades reconstructed — nothing to ingest.")
         return
@@ -300,6 +324,10 @@ def main():
         if args.history:
             show_history(conn)
         elif args.regenerate:
+            # Also refresh strategy configs if NT DB is accessible
+            nt_db = Path(args.nt_db)
+            if nt_db.exists():
+                export_strategy_configs(args.nt_db)
             regenerate_dashboard(conn, run_regime=run_regime)
         elif args.bootstrap:
             cmd_bootstrap(conn, run_regime=run_regime)

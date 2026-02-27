@@ -82,7 +82,7 @@ function loadState() {
         }
 
         // Restore tab
-        const validTabs = ['overview', 'calendar', 'time', 'instruments', 'risk', 'trades'];
+        const validTabs = ['overview', 'calendar', 'time', 'instruments', 'risk', 'trades', 'strategies'];
         if (validTabs.includes(s.activeTab)) {
             appState.activeTab = s.activeTab;
         }
@@ -948,6 +948,12 @@ function destroyAllCharts() {
 }
 
 function renderTab(tabName) {
+    // Strategies tab doesn't need trade metrics
+    if (tabName === 'strategies') {
+        renderStrategyConfigs('strategy-config-container');
+        return;
+    }
+
     const m = getActiveMetrics();
     if (!m || m.tradeCount === 0) return;
 
@@ -990,6 +996,50 @@ function renderTab(tabName) {
             renderTradeLog('tab-trades');
             break;
     }
+}
+
+// --- Strategy Configurations Table ---
+function renderStrategyConfigs(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const configs = (typeof STRATEGY_CONFIGS !== 'undefined') ? STRATEGY_CONFIGS : [];
+    if (configs.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted)">No strategy configs loaded. Run <code>python ingest.py --ninjatrader</code> to export.</p>';
+        return;
+    }
+
+    let html = '<div style="overflow-x:auto"><table class="trade-table">';
+    html += '<thead><tr>';
+    html += '<th>Strategy</th><th>Instrument</th><th>Timeframe</th>';
+    html += '<th>Long</th><th>Short</th><th>Session Start</th><th>Session End</th>';
+    html += '<th>Qty</th><th>Entries/Dir</th><th>Account</th>';
+    html += '</tr></thead><tbody>';
+
+    for (const c of configs) {
+        const longBadge = c.allowLongs
+            ? '<span style="color: var(--green)">Yes</span>'
+            : '<span style="color: var(--text-muted)">No</span>';
+        const shortBadge = c.allowShorts
+            ? '<span style="color: var(--red)">Yes</span>'
+            : '<span style="color: var(--text-muted)">No</span>';
+
+        html += '<tr>';
+        html += `<td><strong>${c.name}</strong></td>`;
+        html += `<td>${c.instrument}</td>`;
+        html += `<td>${c.timeframe}</td>`;
+        html += `<td style="text-align:center">${longBadge}</td>`;
+        html += `<td style="text-align:center">${shortBadge}</td>`;
+        html += `<td>${c.sessionStart}</td>`;
+        html += `<td>${c.sessionEnd}</td>`;
+        html += `<td style="text-align:center">${c.defaultQty}</td>`;
+        html += `<td style="text-align:center">${c.entriesPerDirection}</td>`;
+        html += `<td>${c.account}</td>`;
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
 }
 
 // --- Sub-Strategy Comparison Table ---

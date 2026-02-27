@@ -314,6 +314,119 @@ def _extract_mae_mfe(fills: list[dict], direction: str,
     return max(mae, 0), max(mfe, 0)
 
 
+def read_nt_strategy_configs(db_path: str = DEFAULT_NT_DB) -> list[dict]:
+    """Extract current NinjaScript strategy configurations from NinjaTrader SQLite.
+
+    Parses the Userdata XML blob from each non-ATM strategy row and returns
+    a list of config dicts with key parameters (name, instrument, timeframes,
+    session hours, direction filters, etc.).
+
+    Returns:
+        List of strategy config dicts sorted by name.
+    """
+    import html
+    import re
+    from xml.etree import ElementTree as ET
+
+    db_file = Path(db_path)
+    if not db_file.exists():
+        print(f"  Strategy configs: DB not found: {db_path}")
+        return []
+
+    uri_path = quote(str(db_file.resolve()).replace("\\", "/"), safe="/:")
+    conn = sqlite3.connect(f"file:{uri_path}?immutable=1", uri=True)
+
+    try:
+        cursor = conn.execute("""
+            SELECT s.Id, s.Name, s.Classname, s.IsTerminal, s.Userdata,
+                   a.Name AS AccountName
+            FROM Strategies s
+            LEFT JOIN Strategy2Account s2a ON s.Id = s2a.Strategy
+            LEFT JOIN Accounts a ON s2a.Account = a.Id
+            WHERE s.Classname != 'NinjaTrader.NinjaScript.AtmStrategy'
+        """)
+
+        seen_ids = set()
+        configs = []
+
+        for row in cursor.fetchall():
+            sid, name, classname, is_terminal, userdata_blob, account = row
+            # Deduplicate (join can produce multiple rows per strategy)
+            if sid in seen_ids:
+                continue
+            seen_ids.add(sid)
+
+            if not userdata_blob:
+                continue
+
+            try:
+                userdata = userdata_blob.decode("utf-16-le")
+            except (UnicodeDecodeError, AttributeError):
+                continue
+
+            impl_match = re.search(r"<_Impl>(.*?)</_Impl>", userdata, re.DOTALL)
+            if not impl_match:
+                continue
+
+            try:
+                xml_text = html.unescape(impl_match.group(1))
+                root = ET.fromstring(xml_text)
+            except ET.ParseError:
+                continue
+
+            def _get(tag, default=""):
+                el = root.find(tag)
+                return el.text if el is not None and el.text else default
+
+            # Extract session times (datetime strings → HH:MM)
+            session_start = _get("SESSION_START")
+            session_end = _get("SESSION_END")
+            try:
+                session_start = session_start.split("T")[1][:5] if "T" in session_start else session_start
+            except (IndexError, AttributeError):
+                session_start = ""
+            try:
+                session_end = session_end.split("T")[1][:5] if "T" in session_end else session_end
+            except (IndexError, AttributeError):
+                session_end = ""
+
+            # Build timeframe string
+            ltf = _get("LOWER_TIMEFRAME", "")
+            htf = _get("HIGHER_TIMEFRAME", "")
+            htf_type = _get("HIGHER_TIMEFRAME_PERIOD_TYPE", "Minute")
+            unit = "min" if htf_type == "Minute" else htf_type
+            timeframe = ""
+            if ltf and htf:
+                timeframe = f"{ltf} / {htf} {unit}"
+            elif ltf:
+                timeframe = f"{ltf} {unit}"
+
+            # Short classname: strip namespace
+            short_class = classname.rsplit(".", 1)[-1] if classname else ""
+
+            configs.append({
+                "name": name or "",
+                "className": short_class,
+                "account": account or "",
+                "instrument": _get("InstrumentOrInstrumentList"),
+                "timeframe": timeframe,
+                "allowLongs": _get("ALLOW_LONGS", "true") == "true",
+                "allowShorts": _get("ALLOW_SHORTS", "true") == "true",
+                "sessionStart": session_start,
+                "sessionEnd": session_end,
+                "defaultQty": int(_get("DefaultQuantity", "1") or "1"),
+                "entriesPerDirection": int(_get("EntriesPerDirection", "1") or "1"),
+                "isTerminal": bool(is_terminal),
+            })
+
+        configs.sort(key=lambda c: c["name"])
+        print(f"  Strategy configs: {len(configs)} NinjaScript strategies found")
+        return configs
+
+    finally:
+        conn.close()
+
+
 def read_nt_trades(db_path: str = DEFAULT_NT_DB,
                    accounts: str = "Sim*") -> list[dict]:
     """Read NinjaTrader SQLite database and reconstruct trades.
