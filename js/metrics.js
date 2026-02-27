@@ -303,12 +303,10 @@ function getGlobalFilteredTrades() {
     if (appState.globalDirection) {
         trades = trades.filter(t => t.direction === appState.globalDirection);
     }
-    if (appState.globalStatus) {
+    if (appState.globalStatus.size > 0) {
         trades = trades.filter(t => {
-            if (appState.globalStatus === 'Win') return t.profit > 0;
-            if (appState.globalStatus === 'Loss') return t.profit < 0;
-            if (appState.globalStatus === 'BE') return t.profit === 0;
-            return true;
+            const status = t.profit > 0 ? 'Win' : t.profit < 0 ? 'Loss' : 'BE';
+            return appState.globalStatus.has(status);
         });
     }
     if (appState.globalInstruments.size > 0) {
@@ -335,7 +333,7 @@ function hasAnyGlobalFilter() {
         || (appState.globalDateTo && appState.globalDateTo < dr.end);
     return appState.hideProp
         || appState.globalDirection
-        || appState.globalStatus
+        || appState.globalStatus.size > 0
         || appState.globalInstruments.size > 0
         || appState.globalHours.size > 0
         || hasDateFilter;
