@@ -333,8 +333,9 @@ def read_nt_strategy_configs(db_path: str = DEFAULT_NT_DB) -> list[dict]:
         print(f"  Strategy configs: DB not found: {db_path}")
         return []
 
-    uri_path = quote(str(db_file.resolve()).replace("\\", "/"), safe="/:")
-    conn = sqlite3.connect(f"file:{uri_path}?immutable=1", uri=True)
+    abs_path = str(db_file.resolve()).replace("\\", "/")
+    uri_path = quote(abs_path, safe="/:")
+    conn = sqlite3.connect(f"file:///{uri_path}?immutable=1", uri=True)
 
     try:
         cursor = conn.execute("""
@@ -450,10 +451,10 @@ def read_nt_trades(db_path: str = DEFAULT_NT_DB,
         print(f"  ERROR: Database file not found: {db_path}")
         return []
 
-    # Build a proper file URI — forward slashes, URL-encode spaces/special chars
-    # so the SQLite URI parser handles paths like "NinjaTrader 8" correctly
-    uri_path = quote(str(db_file.resolve()).replace("\\", "/"), safe="/:")
-    nt_conn = sqlite3.connect(f"file:{uri_path}?immutable=1", uri=True)
+    # Build a proper file URI — file:///C:/path with URL-encoded special chars
+    abs_path = str(db_file.resolve()).replace("\\", "/")
+    uri_path = quote(abs_path, safe="/:")
+    nt_conn = sqlite3.connect(f"file:///{uri_path}?immutable=1", uri=True)
 
     try:
         fills = _read_fills(nt_conn, accounts)
