@@ -446,7 +446,7 @@ function renderTradeLog(containerId) {
         { key: 'id', label: '#', cls: 'num' },
         { key: 'exitTime', label: 'Time', cls: '' },
         { key: 'instrument', label: 'Instrument', cls: '' },
-        { key: 'strategy', label: 'Strategy', cls: '' },
+        { key: 'strategy', label: 'Account', cls: '' },
         { key: 'subStrategy', label: 'Account', cls: '' },
         { key: 'direction', label: 'Dir', cls: '' },
         { key: 'qty', label: 'Qty', cls: 'num' },

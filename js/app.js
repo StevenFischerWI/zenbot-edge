@@ -775,7 +775,7 @@ function renderSidebar() {
     </li>`;
 
     items.forEach(item => {
-        if (sidebarOverride && item.trades === 0) return; // hide strategies with no matching trades
+        if (sidebarOverride && item.trades === 0) return; // hide accounts with no matching trades
         const variantLabel = item.variants > 1 ? `<span style="color:var(--text-muted);font-size:10px"> (${item.variants})</span>` : '';
         const isSelected = appState.selectedStrategies.has(item.key);
         html += `<li class="strategy-item ${isSelected ? 'active' : ''}" onclick="toggleStrategy('${item.key}')">
@@ -1058,7 +1058,7 @@ function renderSubStrategyTable(containerId, subStrategies) {
     const sel = appState.selectedStrategies;
     const isAll = sel.has('_ALL');
     const isSingle = !isAll && sel.size === 1;
-    const nameHeader = (isAll || !isSingle) ? 'Strategy' : 'Variant';
+    const nameHeader = (isAll || !isSingle) ? 'Account' : 'Variant';
 
     const sorted = [...validSubs].sort((a, b) => b.totalPnL - a.totalPnL);
 
