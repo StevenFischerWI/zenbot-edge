@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZenBotEDGE - Strategy Config</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css?v=7">
+    <script>try{if(JSON.parse(localStorage.getItem('futures-analysis-state')).theme==='light')document.documentElement.setAttribute('data-theme','light')}catch(e){}</script>
+</head>
+<body>
+
+<header class="header">
+    <div class="header-left">
+        <a href="index.html" class="logo">ZenBot<span class="logo-accent">EDGE</span></a>
+        <span style="color: var(--text-muted); margin-left: 12px; font-size: 13px;">Strategy Config</span>
+    </div>
+</header>
+
+<div style="max-width: 1200px; margin: 80px auto 40px; padding: 0 24px;">
+    <div class="chart-card">
+        <h4>NinjaTrader Strategy Configurations</h4>
+        <div id="strategy-config-container">
+            <p style="color: var(--text-muted)">Loading...</p>
+        </div>
+    </div>
+</div>
+
+<script>document.write('<script src="data/strategies.js?v=' + Date.now() + '"><\/script>')</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const container = document.getElementById('strategy-config-container');
+    const configs = (typeof STRATEGY_CONFIGS !== 'undefined') ? STRATEGY_CONFIGS : [];
+
+    if (configs.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-muted)">No strategy configs loaded. Run <code>python ingest.py --ninjatrader</code> to export.</p>';
+        return;
+    }
+
+    let html = '<div style="overflow-x:auto"><table class="trade-table">';
+    html += '<thead><tr>';
+    html += '<th>Strategy</th><th>Instrument</th><th>Timeframe</th>';
+    html += '<th>Qty</th><th>Long</th><th>Short</th>';
+    html += '<th>Session Start</th><th>Session End</th><th>Account</th>';
+    html += '</tr></thead><tbody>';
+
+    for (const c of configs) {
+        const longBadge = c.allowLongs
+            ? '<span style="color: var(--green)">Yes</span>'
+            : '<span style="color: var(--text-muted)">No</span>';
+        const shortBadge = c.allowShorts
+            ? '<span style="color: var(--red)">Yes</span>'
+            : '<span style="color: var(--text-muted)">No</span>';
+
+        html += '<tr>';
+        html += '<td><strong>' + c.name + '</strong></td>';
+        html += '<td>' + c.instrument + '</td>';
+        html += '<td>' + c.timeframe + '</td>';
+        html += '<td style="text-align:center">' + c.qty + '</td>';
+        html += '<td style="text-align:center">' + longBadge + '</td>';
+        html += '<td style="text-align:center">' + shortBadge + '</td>';
+        html += '<td>' + c.sessionStart + '</td>';
+        html += '<td>' + c.sessionEnd + '</td>';
+        html += '<td>' + c.account + '</td>';
+        html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+});
+</script>
+
+</body>
+</html>

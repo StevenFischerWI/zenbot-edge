@@ -107,7 +107,6 @@
         <button class="tab-btn" data-tab="instruments" onclick="switchTab('instruments')">Instruments</button>
         <button class="tab-btn" data-tab="risk" onclick="switchTab('risk')">Risk & Efficiency</button>
         <button class="tab-btn" data-tab="trades" onclick="switchTab('trades')">Trade Log</button>
-        <button class="tab-btn" data-tab="strategies" onclick="switchTab('strategies')">Strategies</button>
     </div>
 
     <!-- TAB: Overview -->
@@ -234,17 +233,6 @@
         <!-- Rendered dynamically by metrics.js -->
     </div>
 
-    <!-- TAB: Strategies -->
-    <div class="tab-content" id="tab-strategies">
-        <div class="chart-grid cols-1 mb-16">
-            <div class="chart-card">
-                <h4>NinjaTrader Strategy Configurations</h4>
-                <div id="strategy-config-container">
-                    <p style="color: var(--text-muted)">No strategy configs loaded. Run <code>python ingest.py --ninjatrader</code> to export.</p>
-                </div>
-            </div>
-        </div>
-    </div>
 
 </div>
 
@@ -268,7 +256,6 @@
 
 <!-- Data & Scripts (order matters) -->
 <script>document.write('<script src="data/trades.js?v=' + Date.now() + '"><\/script>')</script>
-<script>document.write('<script src="data/strategies.js?v=' + Date.now() + '"><\/script>')</script>
 <script src="js/utils.js?v=6"></script>
 <script src="js/charts.js?v=6"></script>
 <script src="js/metrics.js?v=6"></script>
