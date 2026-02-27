@@ -414,8 +414,8 @@ def read_nt_strategy_configs(db_path: str = DEFAULT_NT_DB) -> list[dict]:
                 "allowShorts": _get("ALLOW_SHORTS", "true") == "true",
                 "sessionStart": session_start,
                 "sessionEnd": session_end,
-                "defaultQty": int(_get("DefaultQuantity", "1") or "1"),
-                "entriesPerDirection": int(_get("EntriesPerDirection", "1") or "1"),
+                "qty": int(_get("FIRST_TARGET_CONTRACT_SIZE", "0") or "0")
+                    or int(_get("DefaultQuantity", "1") or "1"),
                 "isTerminal": bool(is_terminal),
             })
 

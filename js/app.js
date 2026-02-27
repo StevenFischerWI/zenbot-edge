@@ -1012,8 +1012,8 @@ function renderStrategyConfigs(containerId) {
     let html = '<div style="overflow-x:auto"><table class="trade-table">';
     html += '<thead><tr>';
     html += '<th>Strategy</th><th>Instrument</th><th>Timeframe</th>';
-    html += '<th>Long</th><th>Short</th><th>Session Start</th><th>Session End</th>';
-    html += '<th>Qty</th><th>Entries/Dir</th><th>Account</th>';
+    html += '<th>Qty</th><th>Long</th><th>Short</th>';
+    html += '<th>Session Start</th><th>Session End</th><th>Account</th>';
     html += '</tr></thead><tbody>';
 
     for (const c of configs) {
@@ -1028,12 +1028,11 @@ function renderStrategyConfigs(containerId) {
         html += `<td><strong>${c.name}</strong></td>`;
         html += `<td>${c.instrument}</td>`;
         html += `<td>${c.timeframe}</td>`;
+        html += `<td style="text-align:center">${c.qty}</td>`;
         html += `<td style="text-align:center">${longBadge}</td>`;
         html += `<td style="text-align:center">${shortBadge}</td>`;
         html += `<td>${c.sessionStart}</td>`;
         html += `<td>${c.sessionEnd}</td>`;
-        html += `<td style="text-align:center">${c.defaultQty}</td>`;
-        html += `<td style="text-align:center">${c.entriesPerDirection}</td>`;
         html += `<td>${c.account}</td>`;
         html += '</tr>';
     }
