@@ -579,7 +579,8 @@ function parseSchwabAccountStatement(csvText) {
         });
     }
 
-    // Group by root symbol for FIFO matching
+    // Flat-to-flat position tracking per root symbol
+    // (matches TraderSync: builds position with avg price, closes when returning to flat)
     const fillsByRoot = {};
     for (const fill of consolidated) {
         const root = getFuturesRoot(fill.symbol);
@@ -591,47 +592,63 @@ function parseSchwabAccountStatement(csvText) {
 
     for (const root of Object.keys(fillsByRoot)) {
         const fills = fillsByRoot[root];
-        // Ensure chronological order
         fills.sort((a, b) => a.execTime - b.execTime);
 
-        const longQueue = [];
-        const shortQueue = [];
+        // Position state: qty=0 means flat
+        let pos = { qty: 0, side: null, avgPrice: 0, totalFees: 0, entryTime: null, symbol: null };
 
         for (const fill of fills) {
-            if (fill.side === 'BUY') {
-                // Try to close shorts first
-                let remaining = fill.qty;
-                while (remaining > 0 && shortQueue.length > 0) {
-                    const open = shortQueue[0];
-                    const matchQty = Math.min(remaining, open.qty);
-                    const commission = Math.round((open.feePerContract + fill.feePerContract) * matchQty * 100) / 100;
-                    const trade = buildSchwabTrade(open, fill, matchQty, 'Short', root, account);
-                    trade.commission = commission;
-                    trades.push(trade);
-                    remaining -= matchQty;
-                    open.qty -= matchQty;
-                    if (open.qty <= 0) shortQueue.shift();
-                }
-                if (remaining > 0) {
-                    longQueue.push({ ...fill, qty: remaining });
-                }
+            const fillIsBuy = fill.side === 'BUY';
+            const fillFees = fill.feePerContract * fill.qty;
+
+            if (pos.qty === 0) {
+                // Flat → open new position
+                pos.qty = fill.qty;
+                pos.side = fillIsBuy ? 'Long' : 'Short';
+                pos.avgPrice = fill.price;
+                pos.totalFees = fillFees;
+                pos.entryTime = fill.execTime;
+                pos.symbol = fill.symbol;
+            } else if ((fillIsBuy && pos.side === 'Long') || (!fillIsBuy && pos.side === 'Short')) {
+                // Adding to existing position — update weighted avg price
+                const newQty = pos.qty + fill.qty;
+                pos.avgPrice = (pos.avgPrice * pos.qty + fill.price * fill.qty) / newQty;
+                pos.qty = newQty;
+                pos.totalFees += fillFees;
             } else {
-                // Try to close longs first
-                let remaining = fill.qty;
-                while (remaining > 0 && longQueue.length > 0) {
-                    const open = longQueue[0];
-                    const matchQty = Math.min(remaining, open.qty);
-                    const commission = Math.round((open.feePerContract + fill.feePerContract) * matchQty * 100) / 100;
-                    const trade = buildSchwabTrade(open, fill, matchQty, 'Long', root, account);
-                    trade.commission = commission;
+                // Opposite direction — reducing/closing/flipping position
+                const closeQty = Math.min(fill.qty, pos.qty);
+
+                // Track exit fills for weighted avg exit price
+                if (!pos.exitFills) pos.exitFills = [];
+                pos.exitFills.push({ price: fill.price, qty: closeQty, feePerContract: fill.feePerContract, execTime: fill.execTime });
+                pos.totalFees += fill.feePerContract * closeQty;
+                pos.qty -= closeQty;
+
+                const leftover = fill.qty - closeQty;
+
+                if (pos.qty === 0) {
+                    // Position fully closed → create trade
+                    const totalExitQty = pos.exitFills.reduce((s, f) => s + f.qty, 0);
+                    const avgExitPrice = pos.exitFills.reduce((s, f) => s + f.price * f.qty, 0) / totalExitQty;
+                    const lastExitTime = pos.exitFills[pos.exitFills.length - 1].execTime;
+
+                    const openFill = { execTime: pos.entryTime, price: pos.avgPrice, symbol: pos.symbol };
+                    const closeFill = { execTime: lastExitTime, price: avgExitPrice, symbol: pos.symbol };
+                    const trade = buildSchwabTrade(openFill, closeFill, totalExitQty, pos.side, root, account);
+                    trade.commission = Math.round(pos.totalFees * 100) / 100;
                     trades.push(trade);
-                    remaining -= matchQty;
-                    open.qty -= matchQty;
-                    if (open.qty <= 0) longQueue.shift();
+
+                    if (leftover > 0) {
+                        // Position flipped to opposite side
+                        pos = { qty: leftover, side: fillIsBuy ? 'Long' : 'Short', avgPrice: fill.price,
+                            totalFees: fill.feePerContract * leftover, entryTime: fill.execTime, symbol: fill.symbol };
+                    } else {
+                        // Back to flat
+                        pos = { qty: 0, side: null, avgPrice: 0, totalFees: 0, entryTime: null, symbol: null };
+                    }
                 }
-                if (remaining > 0) {
-                    shortQueue.push({ ...fill, qty: remaining });
-                }
+                // else: partial close, keep position open and accumulate exit fills
             }
         }
     }
