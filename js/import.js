@@ -492,6 +492,7 @@ function parseSchwabAccountStatement(csvText) {
     const iExecTime = col('Exec Time');
     const iType = col('Type');
     const iDescription = col('Description');
+    const iRefNum = col('Ref #');
     const iMiscFees = col('Misc Fees');
     const iCommFees = col('Commissions & Fees');
 
@@ -534,17 +535,53 @@ function parseSchwabAccountStatement(csvText) {
         const execTime = parseSchwabDateTime(execDateStr + ' ' + execTimeStr);
         if (!execTime || isNaN(execTime.getTime())) continue;
 
+        // Parse Ref # (e.g., ="1005281601527" → 1005281601527)
+        let refNum = (iRefNum !== -1 && row[iRefNum]) ? row[iRefNum].trim().replace(/^="?|"$/g, '') : '';
+        if (refNum === '--') refNum = '';
+
         // Parse fees (both columns may be absent or '--')
         const miscFees = Math.abs(parseSchwabFee(iMiscFees !== -1 ? row[iMiscFees] : ''));
         const commFees = Math.abs(parseSchwabFee(iCommFees !== -1 ? row[iCommFees] : ''));
         const feePerContract = (miscFees + commFees) / qty;
 
-        allFills.push({ execTime, side, qty, symbol, price, feePerContract, account });
+        allFills.push({ execTime, side, qty, symbol, price, feePerContract, account, refNum });
+    }
+
+    // Consolidate partial fills sharing the same Ref # (order ID)
+    // e.g., a sell-4 order filled as four 1-lot lines → one 4-lot fill
+    const consolidated = [];
+    const refGroups = {};
+    for (const fill of allFills) {
+        if (fill.refNum) {
+            const key = fill.refNum + '|' + fill.side;
+            if (!refGroups[key]) refGroups[key] = [];
+            refGroups[key].push(fill);
+        } else {
+            consolidated.push(fill);
+        }
+    }
+    for (const key of Object.keys(refGroups)) {
+        const group = refGroups[key];
+        let totalQty = 0, weightedPrice = 0, totalFees = 0;
+        for (const f of group) {
+            totalQty += f.qty;
+            weightedPrice += f.price * f.qty;
+            totalFees += f.feePerContract * f.qty;
+        }
+        consolidated.push({
+            execTime: group[0].execTime,
+            side: group[0].side,
+            qty: totalQty,
+            symbol: group[0].symbol,
+            price: weightedPrice / totalQty,
+            feePerContract: totalFees / totalQty,
+            account: group[0].account,
+        });
     }
 
     // Group by root symbol for FIFO matching
     const fillsByRoot = {};
-    for (const fill of allFills) {
+    for (const fill of consolidated) {
         const root = getFuturesRoot(fill.symbol);
         if (!fillsByRoot[root]) fillsByRoot[root] = [];
         fillsByRoot[root].push(fill);
