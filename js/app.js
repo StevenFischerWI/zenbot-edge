@@ -9,6 +9,7 @@ const appState = {
     sidebarFilter: '',
     // Global filters
     globalDirection: '',          // '' | 'Long' | 'Short'
+    globalStatus: '',             // '' | 'Win' | 'Loss' | 'BE'
     globalInstruments: new Set(), // Set of instrument strings
     globalHours: new Set(),      // Set of entry hour numbers
     globalDateFrom: '',           // '' | 'YYYY-MM-DD'
@@ -57,6 +58,7 @@ function saveState() {
             sidebarSort: appState.sidebarSort,
             sidebarFilter: appState.sidebarFilter,
             globalDirection: appState.globalDirection,
+            globalStatus: appState.globalStatus,
             globalInstruments: [...appState.globalInstruments],
             globalHours: [...appState.globalHours],
             globalDateFrom: appState.globalDateFrom,
@@ -101,6 +103,9 @@ function loadState() {
         if (s.globalDirection === 'Long' || s.globalDirection === 'Short') {
             appState.globalDirection = s.globalDirection;
         }
+        if (s.globalStatus === 'Win' || s.globalStatus === 'Loss' || s.globalStatus === 'BE') {
+            appState.globalStatus = s.globalStatus;
+        }
         if (Array.isArray(s.globalInstruments)) {
             const validInstruments = new Set(appState.data.metadata.instruments);
             const restored = s.globalInstruments.filter(i => validInstruments.has(i));
@@ -135,6 +140,11 @@ function applyRestoredState() {
     // Sync direction buttons
     document.querySelectorAll('.direction-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.value === appState.globalDirection);
+    });
+
+    // Sync status buttons
+    document.querySelectorAll('#status-btn-group .direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === appState.globalStatus);
     });
 
     // Sync instrument checkboxes and button
@@ -266,6 +276,7 @@ function initFromImport() {
     appState.sidebarSort = 'name';
     appState.sidebarFilter = '';
     appState.globalDirection = '';
+    appState.globalStatus = '';
     appState.globalInstruments = new Set();
     appState.globalHours = new Set();
     appState.globalDateFrom = '';
@@ -390,6 +401,15 @@ function setDirectionFilter(value) {
     applyGlobalFilters();
 }
 
+function setStatusFilter(value) {
+    appState.globalStatus = value;
+    document.querySelectorAll('#status-btn-group .direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === value);
+    });
+    saveState();
+    applyGlobalFilters();
+}
+
 function toggleInstrumentDropdown() {
     document.getElementById('instrument-dropdown').classList.toggle('open');
 }
@@ -458,7 +478,7 @@ function syncInstrumentPresets() {
 function updateInstrumentBtn() {
     const btn = document.getElementById('instrument-filter-btn');
     const n = appState.globalInstruments.size;
-    btn.textContent = n > 0 ? `Instruments (${n})` : 'All Trades';
+    btn.textContent = n > 0 ? `Symbol (${n})` : 'Symbol';
 }
 
 function toggleHourDropdown() {
@@ -641,6 +661,10 @@ function clearGlobalFilters() {
     document.getElementById('global-date-from').value = '';
     document.getElementById('global-date-to').value = dr.end;
     appState.globalDirection = '';
+    appState.globalStatus = '';
+    document.querySelectorAll('#status-btn-group .direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === '');
+    });
     appState.globalDateFrom = '';
     appState.globalDateTo = dr.end;
     appState.hideProp = true;
@@ -667,6 +691,7 @@ function updateFilterBadge() {
     const hasDateFilter = (appState.globalDateFrom && appState.globalDateFrom > dr.start)
         || (appState.globalDateTo && appState.globalDateTo < dr.end);
     const hasFilter = appState.globalDirection
+        || appState.globalStatus
         || appState.globalInstruments.size > 0
         || appState.globalHours.size > 0
         || hasDateFilter;
@@ -687,6 +712,10 @@ function renderFilterSummary() {
 
     if (appState.globalDirection) {
         chips.push(`<span class="filter-chip filter-chip-direction"><span class="filter-chip-label">Dir:</span> ${appState.globalDirection}${x('clearFilterDirection()')}</span>`);
+    }
+
+    if (appState.globalStatus) {
+        chips.push(`<span class="filter-chip filter-chip-direction"><span class="filter-chip-label">Status:</span> ${appState.globalStatus}${x('clearFilterStatus()')}</span>`);
     }
 
     if (appState.globalInstruments.size > 0) {
@@ -724,6 +753,15 @@ function renderFilterSummary() {
 function clearFilterDirection() {
     appState.globalDirection = '';
     document.querySelectorAll('.direction-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.value === '');
+    });
+    saveState();
+    applyGlobalFilters();
+}
+
+function clearFilterStatus() {
+    appState.globalStatus = '';
+    document.querySelectorAll('#status-btn-group .direction-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.value === '');
     });
     saveState();

@@ -61,8 +61,14 @@
             <button class="direction-btn" data-value="Long" onclick="setDirectionFilter('Long')">Long</button>
             <button class="direction-btn" data-value="Short" onclick="setDirectionFilter('Short')">Short</button>
         </div>
+        <div class="direction-btn-group" id="status-btn-group">
+            <button class="direction-btn active" data-value="" onclick="setStatusFilter('')">All</button>
+            <button class="direction-btn" data-value="Win" onclick="setStatusFilter('Win')">Win</button>
+            <button class="direction-btn" data-value="Loss" onclick="setStatusFilter('Loss')">Loss</button>
+            <button class="direction-btn" data-value="BE" onclick="setStatusFilter('BE')">BE</button>
+        </div>
         <div class="instrument-filter-wrapper">
-            <button class="filter-select instrument-filter-btn" id="instrument-filter-btn" onclick="toggleInstrumentDropdown()">Instruments</button>
+            <button class="filter-select instrument-filter-btn" id="instrument-filter-btn" onclick="toggleInstrumentDropdown()">Symbol</button>
             <div class="instrument-dropdown" id="instrument-dropdown"></div>
         </div>
         <div class="instrument-filter-wrapper">
