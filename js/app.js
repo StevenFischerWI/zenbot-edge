@@ -208,6 +208,7 @@ function toggleTheme() {
 function initDashboard() {
     appState.data = TRADE_DATA;
     document.getElementById('header-import-btn').style.display = '';
+    document.getElementById('header-clear-btn').style.display = '';
     loadState();
     applyTheme();
     initChartDefaults();
@@ -253,6 +254,7 @@ function initFromImport() {
     document.querySelector('.sidebar').style.display = '';
     document.querySelector('.main').style.display = '';
     document.getElementById('header-import-btn').style.display = '';
+    document.getElementById('header-clear-btn').style.display = '';
 
     // Save imported data to IndexedDB for next reload
     idbSaveData(TRADE_DATA).catch(() => { /* storage error — ignore */ });
@@ -281,6 +283,16 @@ function initFromImport() {
     renderKPIs();
     renderTab(appState.activeTab);
     saveState();
+}
+
+function clearCachedData() {
+    if (!confirm('Clear all cached trade data? You will need to re-import.')) return;
+    idbOpen().then(db => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).delete(DATA_KEY);
+        tx.oncomplete = () => { db.close(); location.reload(); };
+        tx.onerror = () => { db.close(); };
+    }).catch(() => { location.reload(); });
 }
 
 function showImportPanel() {
