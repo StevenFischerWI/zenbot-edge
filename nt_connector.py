@@ -390,16 +390,19 @@ def read_nt_strategy_configs(db_path: str = DEFAULT_NT_DB) -> list[dict]:
             except (IndexError, AttributeError):
                 session_end = ""
 
-            # Build timeframe string
-            ltf = _get("LOWER_TIMEFRAME", "")
-            htf = _get("HIGHER_TIMEFRAME", "")
-            htf_type = _get("HIGHER_TIMEFRAME_PERIOD_TYPE", "Minute")
-            unit = "min" if htf_type == "Minute" else htf_type
+            # Build timeframe from BarsPeriodSerializable (the data series)
+            _PERIOD_TYPES = {
+                "0": "tick", "1": "vol", "2": "range", "3": "sec",
+                "4": "min", "5": "day", "6": "week", "7": "month",
+            }
+            bp = root.find("BarsPeriodSerializable")
             timeframe = ""
-            if ltf and htf:
-                timeframe = f"{ltf} / {htf} {unit}"
-            elif ltf:
-                timeframe = f"{ltf} {unit}"
+            if bp is not None:
+                bp_type = (bp.findtext("BarsPeriodTypeSerialize") or "").strip()
+                bp_value = (bp.findtext("Value") or "").strip()
+                unit = _PERIOD_TYPES.get(bp_type, bp_type)
+                if bp_value:
+                    timeframe = f"{bp_value} {unit}"
 
             # Short classname: strip namespace
             short_class = classname.rsplit(".", 1)[-1] if classname else ""
