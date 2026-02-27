@@ -768,15 +768,13 @@ def write_summary_markdown(reports_dir: Path, names: list, metrics: dict, all_m:
     # Time analysis
     lines.append("## Time of Day (All Strategies)")
     lines.append("")
-    lines.append("| Hour | Trades | P&L | Win Rate |")
+    lines.append("| Time | Trades | P&L | Win Rate |")
     lines.append("|------|------:|----:|--------:|")
-    for h in sorted(all_m.get("hourlyPnL", {}).keys(), key=int):
-        hr = int(h)
-        label = f"{hr}:00" if hr < 12 else (f"12:00" if hr == 12 else f"{hr}:00")
+    for h in sorted(all_m.get("hourlyPnL", {}).keys()):
         pnl = all_m["hourlyPnL"][h]
         cnt = all_m["hourlyTradeCount"].get(h, 0)
         wr = all_m["hourlyWinRate"].get(h, 0)
-        lines.append(f"| {label} | {cnt} | {fmt_pnl(pnl)} | {wr:.1f}% |")
+        lines.append(f"| {h} | {cnt} | {fmt_pnl(pnl)} | {wr:.1f}% |")
     lines.append("")
 
     lines.append("## Day of Week (All Strategies)")
@@ -861,13 +859,13 @@ def write_per_strategy_reports(reports_dir: Path, names: list, metrics: dict, by
         if hp:
             lines.append("## By Hour")
             lines.append("")
-            lines.append("| Hour | Trades | P&L | Win Rate |")
+            lines.append("| Time | Trades | P&L | Win Rate |")
             lines.append("|------|------:|----:|--------:|")
-            for h in sorted(hp.keys(), key=int):
+            for h in sorted(hp.keys()):
                 pnl = hp[h]
                 cnt = m["hourlyTradeCount"].get(h, 0)
                 wr = m["hourlyWinRate"].get(h, 0)
-                lines.append(f"| {int(h):02d}:00 | {cnt} | {fmt_pnl(pnl)} | {wr:.1f}% |")
+                lines.append(f"| {h} | {cnt} | {fmt_pnl(pnl)} | {wr:.1f}% |")
             lines.append("")
 
         # Day of week
