@@ -296,8 +296,9 @@ function computeSubStrategySummaries(trades) {
 
 function getGlobalFilteredTrades() {
     let trades = TRADE_DATA.trades;
-    if (appState.hideApex) {
-        trades = trades.filter(t => !t.strategy.startsWith('APEX'));
+    if (appState.hideProp) {
+        const PROP_PREFIXES = ['APEX', 'TDFY', 'TPT', 'PA', 'LTE', 'FTDY', 'BX', 'CHB', 'BLU'];
+        trades = trades.filter(t => !PROP_PREFIXES.some(p => t.strategy.startsWith(p)));
     }
     if (appState.globalDirection) {
         trades = trades.filter(t => t.direction === appState.globalDirection);
@@ -324,7 +325,7 @@ function hasAnyGlobalFilter() {
     const dr = appState.data.metadata.dateRange;
     const hasDateFilter = (appState.globalDateFrom && appState.globalDateFrom > dr.start)
         || (appState.globalDateTo && appState.globalDateTo < dr.end);
-    return appState.hideApex
+    return appState.hideProp
         || appState.globalDirection
         || appState.globalInstruments.size > 0
         || appState.globalHours.size > 0

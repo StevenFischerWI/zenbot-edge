@@ -13,7 +13,7 @@ const appState = {
     globalHours: new Set(),      // Set of entry hour numbers
     globalDateFrom: '',           // '' | 'YYYY-MM-DD'
     globalDateTo: '',             // '' | 'YYYY-MM-DD'
-    hideApex: true,               // hide APEX-* accounts by default
+    hideProp: true,               // hide prop firm accounts by default
     theme: 'dark',                // 'dark' | 'light'
 };
 
@@ -61,7 +61,7 @@ function saveState() {
             globalHours: [...appState.globalHours],
             globalDateFrom: appState.globalDateFrom,
             globalDateTo: appState.globalDateTo,
-            hideApex: appState.hideApex,
+            hideProp: appState.hideProp,
             theme: appState.theme,
         };
         localStorage.setItem(STATE_KEY, JSON.stringify(s));
@@ -111,8 +111,8 @@ function loadState() {
         }
 
         // Restore hide-apex toggle (default true if absent)
-        if (typeof s.hideApex === 'boolean') {
-            appState.hideApex = s.hideApex;
+        if (typeof s.hideProp === 'boolean') {
+            appState.hideProp = s.hideProp;
         }
 
         // Restore theme
@@ -159,8 +159,8 @@ function applyRestoredState() {
     document.getElementById('global-date-to').value = appState.globalDateTo;
 
     // Sync hide-apex toggle
-    const apexBtn = document.getElementById('hide-apex-btn');
-    if (apexBtn) apexBtn.classList.toggle('active', appState.hideApex);
+    const propBtn = document.getElementById('hide-prop-btn');
+    if (propBtn) propBtn.classList.toggle('active', appState.hideProp);
 
     // Sync sidebar sort buttons
     document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
@@ -604,9 +604,9 @@ document.addEventListener('click', (e) => {
 });
 
 
-function toggleHideApex() {
-    appState.hideApex = !appState.hideApex;
-    document.getElementById('hide-apex-btn').classList.toggle('active', appState.hideApex);
+function toggleHideProp() {
+    appState.hideProp = !appState.hideProp;
+    document.getElementById('hide-prop-btn').classList.toggle('active', appState.hideProp);
     saveState();
     applyGlobalFilters();
 }
@@ -631,9 +631,9 @@ function clearGlobalFilters() {
     appState.globalDirection = '';
     appState.globalDateFrom = '';
     appState.globalDateTo = dr.end;
-    appState.hideApex = true;
-    const apexBtn2 = document.getElementById('hide-apex-btn');
-    if (apexBtn2) apexBtn2.classList.add('active');
+    appState.hideProp = true;
+    const propBtn2 = document.getElementById('hide-prop-btn');
+    if (propBtn2) propBtn2.classList.add('active');
     appState.globalInstruments.clear();
     document.querySelectorAll('#instrument-dropdown input').forEach(cb => cb.checked = false);
     updateInstrumentBtn();
