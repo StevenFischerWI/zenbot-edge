@@ -297,7 +297,7 @@ function computeSubStrategySummaries(trades) {
 function getGlobalFilteredTrades() {
     let trades = TRADE_DATA.trades;
     if (appState.hideProp) {
-        const PROP_PREFIXES = ['APEX', 'TDFY', 'TPT', 'PA', 'LTE', 'FTDY', 'BX', 'CHB', 'BLU'];
+        const PROP_PREFIXES = ['APEX', 'TDFY', 'TDY', 'TPT', 'PA', 'LTE', 'FTDY', 'ftd', 'BX', 'CHB', 'BLU', 'sim101'];
         trades = trades.filter(t => !PROP_PREFIXES.some(p => t.strategy.startsWith(p)));
     }
     if (appState.globalDirection) {
