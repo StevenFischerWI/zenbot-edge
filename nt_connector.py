@@ -15,7 +15,6 @@ import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import quote
 
 from execution_converter import POINT_VALUES, _finalize_trade
 
@@ -333,9 +332,7 @@ def read_nt_strategy_configs(db_path: str = DEFAULT_NT_DB) -> list[dict]:
         print(f"  Strategy configs: DB not found: {db_path}")
         return []
 
-    abs_path = str(db_file.resolve()).replace("\\", "/")
-    uri_path = quote(abs_path, safe="/:")
-    conn = sqlite3.connect(f"file:///{uri_path}?immutable=1", uri=True)
+    conn = sqlite3.connect(str(db_file.resolve()))
 
     try:
         cursor = conn.execute("""
@@ -451,10 +448,7 @@ def read_nt_trades(db_path: str = DEFAULT_NT_DB,
         print(f"  ERROR: Database file not found: {db_path}")
         return []
 
-    # Build a proper file URI — file:///C:/path with URL-encoded special chars
-    abs_path = str(db_file.resolve()).replace("\\", "/")
-    uri_path = quote(abs_path, safe="/:")
-    nt_conn = sqlite3.connect(f"file:///{uri_path}?immutable=1", uri=True)
+    nt_conn = sqlite3.connect(str(db_file.resolve()))
 
     try:
         fills = _read_fills(nt_conn, accounts)
