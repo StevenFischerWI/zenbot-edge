@@ -13,6 +13,7 @@ const appState = {
     globalHours: new Set(),      // Set of entry hour numbers
     globalDateFrom: '',           // '' | 'YYYY-MM-DD'
     globalDateTo: '',             // '' | 'YYYY-MM-DD'
+    hideApex: true,               // hide APEX-* accounts by default
     theme: 'dark',                // 'dark' | 'light'
 };
 
@@ -60,6 +61,7 @@ function saveState() {
             globalHours: [...appState.globalHours],
             globalDateFrom: appState.globalDateFrom,
             globalDateTo: appState.globalDateTo,
+            hideApex: appState.hideApex,
             theme: appState.theme,
         };
         localStorage.setItem(STATE_KEY, JSON.stringify(s));
@@ -108,6 +110,11 @@ function loadState() {
             appState.globalHours = new Set(s.globalHours.filter(h => typeof h === 'string' && /^\d{2}:\d{2}$/.test(h)));
         }
 
+        // Restore hide-apex toggle (default true if absent)
+        if (typeof s.hideApex === 'boolean') {
+            appState.hideApex = s.hideApex;
+        }
+
         // Restore theme
         if (s.theme === 'light' || s.theme === 'dark') {
             appState.theme = s.theme;
@@ -150,6 +157,10 @@ function applyRestoredState() {
     // Sync date inputs
     document.getElementById('global-date-from').value = appState.globalDateFrom;
     document.getElementById('global-date-to').value = appState.globalDateTo;
+
+    // Sync hide-apex toggle
+    const apexBtn = document.getElementById('hide-apex-btn');
+    if (apexBtn) apexBtn.classList.toggle('active', appState.hideApex);
 
     // Sync sidebar sort buttons
     document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
@@ -593,6 +604,13 @@ document.addEventListener('click', (e) => {
 });
 
 
+function toggleHideApex() {
+    appState.hideApex = !appState.hideApex;
+    document.getElementById('hide-apex-btn').classList.toggle('active', appState.hideApex);
+    saveState();
+    applyGlobalFilters();
+}
+
 function applyGlobalFilters() {
     updateFilterBadge();
     renderSidebar();
@@ -613,6 +631,9 @@ function clearGlobalFilters() {
     appState.globalDirection = '';
     appState.globalDateFrom = '';
     appState.globalDateTo = dr.end;
+    appState.hideApex = true;
+    const apexBtn2 = document.getElementById('hide-apex-btn');
+    if (apexBtn2) apexBtn2.classList.add('active');
     appState.globalInstruments.clear();
     document.querySelectorAll('#instrument-dropdown input').forEach(cb => cb.checked = false);
     updateInstrumentBtn();
