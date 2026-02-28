@@ -358,11 +358,12 @@ function populateGlobalFilters() {
         ...instruments.filter(i => !pinnedSet.has(i)).sort((a, b) => a.localeCompare(b))
     ];
     const dd = document.getElementById('instrument-dropdown');
-    dd.innerHTML = `<label class="hour-preset"><input type="checkbox" id="instrument-preset-all" onchange="onInstrumentPresetAll(this.checked)"> <strong>All</strong></label>`
+    dd.innerHTML = `<input type="text" class="instrument-filter-input" placeholder="Filter..." oninput="onInstrumentFilterInput(this.value)" onfocus="this.select()">`
+        + `<label class="hour-preset"><input type="checkbox" id="instrument-preset-all" onchange="onInstrumentPresetAll(this.checked)"> <strong>All</strong></label>`
         + `<label class="hour-preset"><input type="checkbox" id="instrument-preset-usual" onchange="onInstrumentPresetUsual(this.checked)"> <strong>Usual</strong></label>`
         + `<label class="hour-preset"><input type="checkbox" id="instrument-preset-micros" onchange="onInstrumentPresetMicros(this.checked)"> <strong>Micros</strong></label><div class="hour-preset-divider"></div>`
         + sortedInstruments.map(inst =>
-        `<label><input type="checkbox" value="${inst}" onchange="onInstrumentToggle('${inst}', this.checked)"> ${inst}</label>`
+        `<label data-inst="${inst}"><input type="checkbox" value="${inst}" onchange="onInstrumentToggle('${inst}', this.checked)"> ${inst}</label>`
     ).join('');
 
     // Build half-hour checkbox list from half-hours present in data
@@ -431,7 +432,12 @@ function syncStatusButtons() {
 }
 
 function toggleInstrumentDropdown() {
-    document.getElementById('instrument-dropdown').classList.toggle('open');
+    const dd = document.getElementById('instrument-dropdown');
+    dd.classList.toggle('open');
+    if (dd.classList.contains('open')) {
+        const input = dd.querySelector('.instrument-filter-input');
+        if (input) { input.value = ''; onInstrumentFilterInput(''); }
+    }
 }
 
 function onInstrumentPresetAll(checked) {
@@ -449,6 +455,14 @@ function onInstrumentPresetAll(checked) {
 
 const USUAL_INSTRUMENTS = new Set(['ES', 'MES', 'NQ', 'MNQ', 'RTY', 'M2K', 'CL', 'MCL', 'GC', 'MGC', 'YM', 'MYM']);
 const MICRO_INSTRUMENTS = new Set(['MES', 'MNQ', 'M2K', 'MCL', 'MGC', 'MYM']);
+
+function onInstrumentFilterInput(val) {
+    const q = val.toLowerCase();
+    const labels = document.querySelectorAll('#instrument-dropdown label[data-inst]');
+    for (const label of labels) {
+        label.style.display = label.dataset.inst.toLowerCase().includes(q) ? '' : 'none';
+    }
+}
 
 function onInstrumentToggle(inst, checked) {
     if (checked) appState.globalInstruments.add(inst);

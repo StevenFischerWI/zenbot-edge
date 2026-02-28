@@ -406,8 +406,8 @@ body {
     padding: 4px;
     z-index: 50;
     min-width: 180px;
-    max-height: 260px;
-    overflow-y: auto;
+    max-height: none;
+    overflow-y: visible;
     box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
@@ -417,6 +417,22 @@ body {
 
 .instrument-dropdown.open {
     display: block;
+}
+
+.instrument-filter-input {
+    width: calc(100% - 12px);
+    margin: 4px 6px 2px;
+    padding: 4px 8px;
+    font-size: 12px;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    outline: none;
+}
+
+.instrument-filter-input:focus {
+    border-color: var(--accent);
 }
 
 .instrument-dropdown label {

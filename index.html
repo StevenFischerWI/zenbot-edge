@@ -31,7 +31,7 @@
 <aside class="sidebar">
     <div class="sidebar-section">
         <h3>Accounts</h3>
-        <input type="text" class="sidebar-search" placeholder="Filter accounts..." oninput="onSidebarSearch(this.value)">
+        <input type="text" class="sidebar-search" placeholder="Filter accounts..." oninput="onSidebarSearch(this.value)" onfocus="this.select()">
         <div class="sidebar-sort">
             <button class="sort-btn" data-sort="pnl" onclick="onSidebarSort('pnl')">P&L</button>
             <button class="sort-btn" data-sort="wr" onclick="onSidebarSort('wr')">WR%</button>
